@@ -1,0 +1,52 @@
+{
+  "name": "kulsi-ai",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "server:dev": "nodemon server/index.js",
+    "server:start": "node server/index.js",
+    "start:all": "concurrently \"npm run dev\" \"npm run server:dev\""
+  },
+  "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@google/genai": "^1.32.0",
+    "@mui/material": "^7.3.6",
+    "@tailwindcss/vite": "^4.1.17",
+    "bcryptjs": "^3.0.3",
+    "concurrently": "^9.2.1",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "date-fns": "^4.1.0",
+    "express": "^5.2.1",
+    "framer-motion": "^11.0.28",
+    "jsonwebtoken": "^9.0.3",
+    "lucide-react": "^0.556.0",
+    "marked": "^17.0.1",
+    "mongodb": "^7.0.0",
+    "mongoose": "^9.0.1",
+    "react": "^19.2.1",
+    "react-dom": "^19.2.1",
+    "react-router-dom": "^7.10.1",
+    "react-toastify": "^11.0.5",
+    "tailwindcss": "^4.1.17",
+    "turndown": "^7.2.2",
+    "uuid": "^13.0.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.17",
+    "@types/node": "^22.14.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0"
+  },
+  "description": "",
+  "main": "vite.config.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

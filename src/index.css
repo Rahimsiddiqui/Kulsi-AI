@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+body {
+  font-family: "Inter", sans-serif;
+  background-color: #f3f4f6;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+* {
+  scroll-behavior: smooth;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* Hide scrollbar for clean UI but keep functionality */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  ::-webkit-scrollbar {
+    width: 0px;
+    background: transparent;
+  }
+}
