@@ -13,32 +13,51 @@ import {
 } from "../utils/oauthHelper.js";
 
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET;
+
+// Cache for OAuth code processing results (to handle duplicate requests)
+const oauthCodeCache = new Map();
 
 // Middleware to verify JWT token
 export const authMiddleware = async (req, res, next) => {
   try {
-    const token =
-      req.cookies.authToken || req.headers.authorization?.split(" ")[1];
+    const JWT_SECRET = process.env.JWT_SECRET;
+
+    if (!JWT_SECRET) {
+      return res
+        .status(500)
+        .json({ message: "Server configuration error: JWT_SECRET not set" });
+    }
+
+    const authHeader = req.headers.authorization;
+
+    // Use Authorization header only (ignore old cookie tokens)
+    const token = authHeader?.split(" ")[1];
 
     if (!token) {
+      console.warn("[AUTH] No token provided in request");
       return res.status(401).json({ message: "No token provided" });
     }
 
     // Decode token and attach user to request
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.userId = decoded.id || decoded.userId;
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET);
+      req.userId = decoded.id || decoded.userId;
 
-    // Find user in DB
-    const user = await User.findById(req.userId);
+      // Find user in DB
+      const user = await User.findById(req.userId);
 
-    if (!user) {
-      return res.status(401).json({ message: "User not found" });
+      if (!user) {
+        console.warn(`[AUTH] User not found for ID: ${req.userId}`);
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      req.user = user;
+      next();
+    } catch (tokenErr) {
+      return res.status(401).json({ message: "Invalid token" });
     }
-
-    req.user = user;
-    next();
   } catch (err) {
+    console.error("[AUTH] Middleware error:", err);
     return res.status(401).json({ message: "Invalid token" });
   }
 };
@@ -149,6 +168,13 @@ router.post("/login", async (req, res) => {
     }
 
     // Generate token
+    const JWT_SECRET = process.env.JWT_SECRET;
+    if (!JWT_SECRET) {
+      return res
+        .status(500)
+        .json({ message: "Server configuration error: JWT_SECRET not set" });
+    }
+
     const token = jwt.sign({ id: user._id }, JWT_SECRET, {
       expiresIn: "7d",
     });
@@ -203,6 +229,13 @@ router.post("/verify-email", async (req, res) => {
     await user.save();
 
     // Generate token
+    const JWT_SECRET = process.env.JWT_SECRET;
+    if (!JWT_SECRET) {
+      return res
+        .status(500)
+        .json({ message: "Server configuration error: JWT_SECRET not set" });
+    }
+
     const token = jwt.sign({ id: user._id }, JWT_SECRET, {
       expiresIn: "7d",
     });
@@ -394,6 +427,22 @@ router.post("/oauth/callback", async (req, res) => {
         .json({ message: "Authorization code is required" });
     }
 
+    // Create a cache key for this code
+    const codeKey = `${provider}:${code}`;
+
+    // Check if this code was already processed
+    if (oauthCodeCache.has(codeKey)) {
+      const cachedResult = oauthCodeCache.get(codeKey);
+      console.log(
+        `[OAuth Callback] Returning cached result for ${provider}: ${code.substring(
+          0,
+          10
+        )}...`
+      );
+      return res.status(cachedResult.status).json(cachedResult.data);
+    }
+
+    const JWT_SECRET = process.env.JWT_SECRET;
     if (!JWT_SECRET) {
       console.error("[ERROR] JWT_SECRET is not configured");
       return res
@@ -411,19 +460,26 @@ router.post("/oauth/callback", async (req, res) => {
 
     // Exchange code for access token
     const accessToken = await exchangeCodeForToken(provider, code, redirectUri);
+    console.log(`[OAuth Callback] Access token obtained for ${provider}`);
 
     // Get OAuth user info
     const oauthUser = await getOAuthUserInfo(provider, accessToken);
+    console.log(`[OAuth Callback] OAuth user retrieved: ${oauthUser.email}`);
 
     // Find or create user
     const user = await findOrCreateOAuthUser(User, oauthUser);
+    console.log(`[OAuth Callback] User found or created: ${user._id}`);
 
     // Generate JWT token
     const token = jwt.sign({ id: user._id }, JWT_SECRET, {
       expiresIn: "7d",
     });
 
-    res.status(200).json({
+    console.log(`[OAuth Callback] JWT token generated for user ${user._id}`);
+    console.log(`[OAuth Callback] Token: ${token.substring(0, 50)}...`);
+    console.log(`[OAuth Callback] JWT_SECRET length: ${JWT_SECRET.length}`);
+
+    const responseData = {
       message: "OAuth authentication successful",
       token,
       user: {
@@ -434,13 +490,31 @@ router.post("/oauth/callback", async (req, res) => {
         plan: user.plan,
         connectedAccounts: user.connectedAccounts,
       },
-    });
+    };
+
+    // Cache the successful response for 5 minutes
+    oauthCodeCache.set(codeKey, { status: 200, data: responseData });
+    setTimeout(() => {
+      oauthCodeCache.delete(codeKey);
+    }, 5 * 60 * 1000);
+
+    res.status(200).json(responseData);
   } catch (err) {
-    console.error("[ERROR] OAuth callback failed:", err.message);
-    res.status(500).json({
+    console.error("[ERROR] OAuth callback failed:", err);
+    console.error("[ERROR] Stack:", err.stack);
+
+    // Cache error responses for 1 minute to prevent retry spam
+    const codeKey = `${provider}:${code}`;
+    const errorData = {
       message: "OAuth authentication failed",
       error: err.message,
-    });
+    };
+    oauthCodeCache.set(codeKey, { status: 500, data: errorData });
+    setTimeout(() => {
+      oauthCodeCache.delete(codeKey);
+    }, 60 * 1000);
+
+    res.status(500).json(errorData);
   }
 });
 

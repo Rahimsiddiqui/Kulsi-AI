@@ -5,6 +5,10 @@
 
 export const exchangeCodeForToken = async (provider, code, redirectUri) => {
   if (provider === "google") {
+    if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+      throw new Error("Google OAuth credentials not configured");
+    }
+
     const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -33,6 +37,10 @@ export const exchangeCodeForToken = async (provider, code, redirectUri) => {
 
     return tokenData.access_token;
   } else if (provider === "github") {
+    if (!process.env.GITHUB_CLIENT_ID || !process.env.GITHUB_CLIENT_SECRET) {
+      throw new Error("GitHub OAuth credentials not configured");
+    }
+
     const tokenResponse = await fetch(
       "https://github.com/login/oauth/access_token",
       {

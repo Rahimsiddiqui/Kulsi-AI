@@ -19,14 +19,15 @@ const NoteList = ({
   const [searchQuery, setSearchQuery] = useState("");
 
   const filteredNotes = useMemo(() => {
+    const query = (searchQuery || "").toLowerCase();
     return notes
-      .filter(
-        (note) =>
-          note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          note.content.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-      .sort((a, b) => b.updatedAt - a.updatedAt)
-      .sort((a, b) => Number(b.isPinned) - Number(a.isPinned)); // Pinned first
+      .filter((note) => {
+        const title = (note.title || "").toLowerCase();
+        const content = (note.content || "").toLowerCase();
+        return title.includes(query) || content.includes(query);
+      })
+      .sort((a, b) => Number(b.isPinned) - Number(a.isPinned)) // Pinned first
+      .sort((a, b) => b.updatedAt - a.updatedAt); // Then by date
   }, [notes, searchQuery]);
 
   return (
@@ -95,7 +96,7 @@ const NoteList = ({
                     {note.title || "Untitled Note"}
                   </h3>
                   {note.isPinned && (
-                    <Pin className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-0.5 fill-amber-500" />
+                    <Pin className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5 fill-amber-500" />
                   )}
                 </div>
 

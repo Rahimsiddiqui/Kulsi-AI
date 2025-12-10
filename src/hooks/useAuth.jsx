@@ -13,13 +13,35 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
+        // First check if token exists in localStorage
+        const token = localStorage.getItem("token");
+        const storedUser = localStorage.getItem("user");
+
+        if (!token) {
+          // No token stored, user is not authenticated
+          setLoading(false);
+          return;
+        }
+
+        // Token exists, verify it with server
         const currentUser = await authService.getCurrentUser();
         if (currentUser) {
           setUser(currentUser);
           setIsAuthenticated(true);
+        } else {
+          // Token is invalid or expired, clear auth state
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          setUser(null);
+          setIsAuthenticated(false);
         }
       } catch (err) {
         console.error("Auth check failed:", err);
+        // On error, clear auth to be safe
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        setUser(null);
+        setIsAuthenticated(false);
       } finally {
         setLoading(false);
       }

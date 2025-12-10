@@ -50,15 +50,20 @@ const AppContent = () => {
   // Responsive Sidebar Logic
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth > 768) {
+      const isDesktopNow = window.innerWidth > 768;
+      if (isDesktopNow) {
         // Desktop defaults
-        if (!sidebarOpen) setSidebarOpen(true);
-        if (!isNoteListOpen) setIsNoteListOpen(true);
+        setSidebarOpen(true);
+        setIsNoteListOpen(true);
       } else {
-        // Mobile defaults
+        // Mobile: close note list when on small screens
         setSidebarOpen(false);
       }
     };
+
+    // Set initial state
+    handleResize();
+
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
@@ -92,14 +97,31 @@ const AppContent = () => {
   }, [addNote, activeFolderId, userPlan, notes.length]);
 
   const generateFlashcardsForView = async () => {
-    if (filteredNotes.length === 0) return;
+    if (!filteredNotes || filteredNotes.length === 0) {
+      toast.error("No notes available to create flashcards");
+      return;
+    }
     setIsGeneratingFlashcards(true);
     try {
       const contextNote = filteredNotes[0];
+      if (!contextNote?.content) {
+        toast.error("Selected note has no content");
+        return;
+      }
       const cards = await generateFlashcards(contextNote.content);
+      if (!Array.isArray(cards)) {
+        toast.error("Invalid flashcard format received");
+        return;
+      }
       setFlashcards(cards);
-    } catch (e) {
-      console.error(e);
+      if (cards.length === 0) {
+        toast.info("No flashcards could be generated from this note");
+      } else {
+        toast.success(`Generated ${cards.length} flashcards`);
+      }
+    } catch (error) {
+      console.error("Flashcard generation error:", error);
+      toast.error(error.message || "Failed to generate flashcards");
     } finally {
       setIsGeneratingFlashcards(false);
     }
@@ -173,9 +195,10 @@ const AppContent = () => {
           />
 
           {/* Mobile Sidebar Overlay */}
-          <AnimatePresence>
+          <AnimatePresence mode="wait">
             {sidebarOpen && !isDesktop && (
               <motion.div
+                key="sidebar-overlay"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
@@ -194,7 +217,7 @@ const AppContent = () => {
               width: isDesktop ? (sidebarOpen ? 256 : 72) : 288, // 72px for mini sidebar
               opacity: 1,
             }}
-            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            transition={{ duration: 0.4, ease: "easeInOut" }}
             style={{
               position: isDesktop ? "relative" : "fixed",
               left: 0,
@@ -241,17 +264,15 @@ const AppContent = () => {
             )}
 
             {/* Note List Column */}
-            <AnimatePresence mode="popLayout">
+            <AnimatePresence mode="wait">
               {currentView === "notes" && isNoteListOpen && (
                 <motion.div
+                  key="note-list"
                   initial={{ width: 0, opacity: 0 }}
                   animate={{ width: isDesktop ? 320 : "100%", opacity: 1 }}
                   exit={{ width: 0, opacity: 0 }}
-                  transition={{ duration: 0.2, ease: "easeInOut" }}
-                  className={`
-                        ${selectedNoteId && !isDesktop ? "hidden" : "block"} 
-                        h-full bg-white z-0 shrink-0 border-r border-gray-100 overflow-hidden
-                        `}
+                  transition={{ duration: 0.3, ease: "easeInOut" }}
+                  className="h-full bg-white z-0 shrink-0 border-r border-gray-100 overflow-hidden"
                 >
                   <NoteList
                     notes={filteredNotes}
@@ -503,7 +524,11 @@ const App = () => {
   // Handle OAuth callback on mount
   useEffect(() => {
     if (window.location.pathname === "/auth/callback") {
-      handleOAuthCallback();
+      // Prevent handling callback multiple times
+      if (!window.__oauthCallbackProcessed) {
+        window.__oauthCallbackProcessed = true;
+        handleOAuthCallback();
+      }
     }
   }, []);
 
@@ -544,18 +569,14 @@ const App = () => {
       localStorage.removeItem("authMode");
       localStorage.removeItem("oauthProvider");
 
-      // Redirect to home
-      setTimeout(() => {
-        window.history.replaceState({}, document.title, "/");
-      }, 500);
+      // Reload page to reinitialize auth with new token in localStorage
+      window.location.href = "/";
     } catch (err) {
       console.error("OAuth callback error:", err);
       localStorage.removeItem("authMode");
       localStorage.removeItem("oauthProvider");
 
-      setTimeout(() => {
-        window.history.replaceState({}, document.title, "/");
-      }, 2000);
+      window.location.href = "/";
     }
   };
 

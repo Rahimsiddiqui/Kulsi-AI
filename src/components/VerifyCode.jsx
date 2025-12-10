@@ -22,7 +22,12 @@ const VerifyCode = ({ email, onSubmit, onResend, onBack }) => {
     setError("");
 
     if (!code || code.length !== 6) {
-      setError("Please enter a 6-digit code");
+      setError("Please enter a valid 6-digit code");
+      return;
+    }
+
+    if (!/^\d{6}$/.test(code)) {
+      setError("Code must contain only numbers");
       return;
     }
 
@@ -30,7 +35,7 @@ const VerifyCode = ({ email, onSubmit, onResend, onBack }) => {
     try {
       await onSubmit({ email, code });
     } catch (err) {
-      setError(err.message || "Verification failed");
+      setError(err.message || "Verification failed. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -67,11 +72,16 @@ const VerifyCode = ({ email, onSubmit, onResend, onBack }) => {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1 relative">
-            <label className="text-xs font-medium text-textMuted ml-1">
+            <label
+              htmlFor="verification-code"
+              className="text-xs font-medium text-textMuted ml-1"
+            >
               Verification Code
             </label>
             <input
+              id="verification-code"
               type="text"
+              inputMode="numeric"
               value={code}
               onChange={(e) =>
                 setCode(e.target.value.replace(/\D/g, "").slice(0, 6))
@@ -79,12 +89,20 @@ const VerifyCode = ({ email, onSubmit, onResend, onBack }) => {
               disabled={loading}
               placeholder="000000"
               maxLength="6"
+              aria-label="Verification code"
+              aria-invalid={error ? "true" : "false"}
+              aria-describedby={error ? "verification-error" : undefined}
               className="w-full px-4 py-4 text-center text-3xl tracking-[.25em] bg-surfaceHighlight border border-border rounded-xl text-textMain placeholder-gray-400 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all font-mono disabled:opacity-60"
             />
           </div>
 
           {error && (
-            <div className="text-red-500 text-sm text-center bg-red-50 p-2 rounded-lg border border-red-100 animate-in fade-in slide-in-from-top-2">
+            <div
+              id="verification-error"
+              className="text-red-500 text-sm text-center bg-red-50 p-2 rounded-lg border border-red-100 animate-in fade-in slide-in-from-top-2"
+              role="alert"
+              aria-live="polite"
+            >
               {error}
             </div>
           )}
@@ -93,6 +111,7 @@ const VerifyCode = ({ email, onSubmit, onResend, onBack }) => {
             type="submit"
             disabled={loading || code.length !== 6}
             className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition-all transform hover:scale-[1.01] active:scale-[0.98] shadow-lg shadow-primary/20 disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed disabled:hover:scale-100 disabled:shadow-none"
+            aria-label={loading ? "Verifying code" : "Verify code"}
           >
             {loading ? (
               <>

@@ -168,17 +168,32 @@ const AuthForm = ({ onLogin }) => {
         <form onSubmit={handleSubmit} className="space-y-4">
           {!isLogin && (
             <div className="space-y-1 relative group">
-              <label className="text-xs font-medium text-textMuted ml-1">
+              <label
+                htmlFor="name"
+                className="text-xs font-medium text-textMuted ml-1"
+              >
                 Full Name
               </label>
               <div className="relative">
-                <User className="absolute left-3 top-3.5 w-5 h-5 text-gray-400" />
+                <User className="absolute left-3 top-3.5 w-5 h-5 text-gray-400 pointer-events-none" />
                 <input
+                  id="name"
                   type="text"
                   name="name"
                   value={formData.name}
                   onChange={handleChange}
                   disabled={loading}
+                  aria-label="Full Name"
+                  aria-invalid={
+                    formData.name && !validations.name(formData.name)
+                      ? "true"
+                      : "false"
+                  }
+                  aria-describedby={
+                    formData.name && !validations.name(formData.name)
+                      ? "name-error"
+                      : undefined
+                  }
                   className={`w-full pl-12 pr-10 py-3 bg-surfaceHighlight border rounded-xl text-textMain focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder-gray-400 disabled:opacity-60 ${
                     formData.name && !validations.name(formData.name)
                       ? "border-red-300 bg-red-50/10"
@@ -194,11 +209,14 @@ const AuthForm = ({ onLogin }) => {
               {/* Inline Hint - Only show if user has started typing */}
               {formData.name.length > 0 && (
                 <div
+                  id="name-error"
                   className={`text-[10px] mt-1 ml-1 transition-colors duration-200 absolute -bottom-[22px] left-0 w-full truncate ${
                     !validations.name(formData.name)
                       ? "text-red-500 font-medium"
                       : "text-green-600"
                   }`}
+                  role="status"
+                  aria-live="polite"
                 >
                   Full name must be at least 6 characters
                 </div>
@@ -211,17 +229,34 @@ const AuthForm = ({ onLogin }) => {
               formData.name.length > 0 && "pt-3"
             } relative`}
           >
-            <label className="text-xs font-medium text-textMuted ml-1">
+            <label
+              htmlFor="email"
+              className="text-xs font-medium text-textMuted ml-1"
+            >
               Email Address
             </label>
             <div className="relative">
-              <Mail className="absolute left-3 top-3.5 w-5 h-5 text-gray-400" />
+              <Mail className="absolute left-3 top-3.5 w-5 h-5 text-gray-400 pointer-events-none" />
               <input
+                id="email"
                 type="email"
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
                 disabled={loading}
+                aria-label="Email Address"
+                aria-invalid={
+                  !isLogin &&
+                  formData.email &&
+                  !validations.email(formData.email)
+                    ? "true"
+                    : "false"
+                }
+                aria-describedby={
+                  formData.email && !validations.email(formData.email)
+                    ? "email-error"
+                    : undefined
+                }
                 className={`w-full pl-12 pr-10 py-3 bg-surfaceHighlight border rounded-xl text-textMain focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder-gray-400 disabled:opacity-60 ${
                   !isLogin &&
                   formData.email &&
@@ -239,11 +274,14 @@ const AuthForm = ({ onLogin }) => {
             {/* Inline Hint - Only show if user has started typing */}
             {formData.email.length > 0 && (
               <div
+                id="email-error"
                 className={`text-[10px] mt-1 ml-1 transition-colors duration-200 absolute -bottom-[22px] left-0 w-full truncate ${
                   !validations.email(formData.email)
                     ? "text-red-500 font-medium"
                     : "text-green-600"
                 }`}
+                role="status"
+                aria-live="polite"
               >
                 Enter a valid email address
               </div>
@@ -255,17 +293,34 @@ const AuthForm = ({ onLogin }) => {
               formData.email.length > 0 && "pt-3"
             } relative`}
           >
-            <label className="text-xs font-medium text-textMuted ml-1">
+            <label
+              htmlFor="password"
+              className="text-xs font-medium text-textMuted ml-1"
+            >
               Password
             </label>
             <div className="relative">
-              <Lock className="absolute left-3 top-3.5 w-5 h-5 text-gray-400" />
+              <Lock className="absolute left-3 top-3.5 w-5 h-5 text-gray-400 pointer-events-none" />
               <input
+                id="password"
                 type="password"
                 name="password"
                 value={formData.password}
                 onChange={handleChange}
                 disabled={loading}
+                aria-label="Password"
+                aria-invalid={
+                  !isLogin &&
+                  formData.password &&
+                  !validations.password(formData.password)
+                    ? "true"
+                    : "false"
+                }
+                aria-describedby={
+                  formData.password && !validations.password(formData.password)
+                    ? "password-error"
+                    : undefined
+                }
                 className={`w-full pl-12 pr-10 py-3 bg-surfaceHighlight border rounded-xl text-textMain focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder-gray-400 disabled:opacity-60 ${
                   !isLogin &&
                   formData.password &&
@@ -283,11 +338,14 @@ const AuthForm = ({ onLogin }) => {
             {/* Inline Hint - Only show if user has started typing */}
             {formData.password.length > 0 && (
               <div
+                id="password-error"
                 className={`text-[10px] mt-1 ml-1 leading-tight transition-colors duration-200 absolute -bottom-[22px] left-0 w-full ${
                   !validations.password(formData.password)
                     ? "text-red-500 font-medium"
                     : "text-green-600"
                 }`}
+                role="status"
+                aria-live="polite"
               >
                 Min 6 chars & include a number and uppercase letter
               </div>
@@ -308,6 +366,15 @@ const AuthForm = ({ onLogin }) => {
             type="submit"
             disabled={loading || !isFormValid}
             className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition-all transform hover:scale-[1.01] active:scale-[0.98] shadow-lg shadow-primary/20 mt-4 disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed disabled:hover:scale-100 disabled:shadow-none"
+            aria-label={
+              loading
+                ? isLogin
+                  ? "Signing in"
+                  : "Creating account"
+                : isLogin
+                ? "Sign in"
+                : "Sign up"
+            }
           >
             {loading ? (
               <>

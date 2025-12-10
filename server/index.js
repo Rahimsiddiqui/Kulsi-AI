@@ -1,4 +1,4 @@
-// Load environment variables FIRST
+// Load environment variables
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -8,12 +8,6 @@ const __dirname = path.dirname(__filename);
 
 // Load .env file relative to server directory
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
-
-console.log(
-  "[DEBUG] Environment loaded - JWT_SECRET exists:",
-  !!process.env.JWT_SECRET
-);
-console.log("[DEBUG] FRONTEND_URL:", process.env.FRONTEND_URL);
 
 // NOW import other modules that need env vars
 import express from "express";

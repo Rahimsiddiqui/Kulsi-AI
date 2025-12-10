@@ -90,7 +90,7 @@ const Sidebar = ({
 
   return (
     <div
-      className={`h-full flex flex-col bg-gray-50/90 backdrop-blur-xl supports-[backdrop-filter]:bg-gray-50/60 w-full transition-all duration-300`}
+      className={`h-full flex flex-col bg-gray-50/90 backdrop-blur-xl supports-backdrop-filter:bg-gray-50/60 w-full transition-all duration-300`}
     >
       <div
         className={`flex items-center ${
@@ -247,7 +247,7 @@ const Sidebar = ({
           <motion.div
             whileHover={{ scale: 1.02 }}
             onClick={onOpenSubscription}
-            className={`bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl ${
+            className={`bg-linear-to-r from-indigo-500 to-purple-600 rounded-xl ${
               isCollapsed ? "p-2" : "p-3"
             } text-white cursor-pointer shadow-md mb-3`}
             title={isCollapsed ? "Go Pro" : undefined}

@@ -5,7 +5,13 @@ import {
   WELCOME_NOTE_CONTENT,
 } from "../../server/config/constants.js";
 
-const generateId = () => Math.random().toString(36).substring(2, 9);
+// Generate unique IDs using better randomness
+const generateId = () => {
+  if (typeof window !== "undefined" && window.crypto?.getRandomValues) {
+    return Math.random().toString(36).substring(2, 11);
+  }
+  return `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+};
 
 const INITIAL_NOTES = [
   {
