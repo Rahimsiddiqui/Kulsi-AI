@@ -146,13 +146,6 @@ const Editor = ({
         // Ensure resolved content is always a string
         const normalizedContent = ensureString(resolvedContent);
 
-        console.log("📥 updateContentWithHistory:", {
-          newContentType: typeof newContent,
-          resolvedType: typeof resolvedContent,
-          normalizedType: typeof normalizedContent,
-          normalized: normalizedContent,
-        });
-
         if (normalizedContent === prevContent) return prevContent;
 
         setHistory((prevHistory) => {
@@ -765,21 +758,21 @@ const Editor = ({
           continue;
         }
 
-        // checkboxes
-        if (line.trim().startsWith("- [ ] ")) {
+        // checkboxes (unchecked: [ ] without dash)
+        if (line.trim().startsWith("[ ] ")) {
           flushList();
           rendered.push(
             <div key={i} className="flex items-start space-x-3 my-2">
               <div className="shrink-0 mt-1.5 w-4 h-4 rounded border border-gray-300 bg-white" />
               <span className="text-gray-700">
-                {parseInline(line.replace("- [ ] ", ""))}
+                {parseInline(line.replace("[ ] ", ""))}
               </span>
             </div>
           );
           i++;
           continue;
         }
-        if (line.trim().startsWith("- [x] ")) {
+        if (line.trim().startsWith("[x] ")) {
           flushList();
           rendered.push(
             <div key={i} className="flex items-start space-x-3 my-2 opacity-60">
@@ -787,7 +780,7 @@ const Editor = ({
                 <CheckSquare className="w-3 h-3 text-white" />
               </div>
               <span className="text-gray-500 line-through">
-                {parseInline(line.replace("- [x] ", ""))}
+                {parseInline(line.replace("[x] ", ""))}
               </span>
             </div>
           );
@@ -795,12 +788,8 @@ const Editor = ({
           continue;
         }
 
-        // bullet lists
-        if (
-          line.trim().startsWith("- ") &&
-          !line.trim().startsWith("- [ ") &&
-          !line.trim().startsWith("- [x")
-        ) {
+        // bullet lists (only regular items with dash, not checkboxes)
+        if (line.trim().startsWith("- ")) {
           if (currentListType !== "bullet") {
             flushList();
             currentListType = "bullet";
@@ -1334,7 +1323,7 @@ const Editor = ({
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
         <div className="flex-1 flex flex-col overflow-y-auto bg-white">
-          <div className="max-w-5xl w-full mx-auto px-6 py-10 md:px-12 flex-1 flex flex-col">
+          <div className="max-w-5xl w-full px-6 py-10 md:px-12 flex-1 flex flex-col">
             <input
               type="text"
               value={title}

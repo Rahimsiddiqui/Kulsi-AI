@@ -298,15 +298,6 @@ const AppContent = () => {
               {currentView === "notes" ? (
                 selectedNote ? (
                   <div className="h-full flex flex-col">
-                    {/* Mobile Back Button */}
-                    {!isDesktop && (
-                      <button
-                        onClick={() => setSelectedNoteId(null)}
-                        className="absolute top-20 left-4 z-40 p-2 bg-white rounded-full shadow-md border border-gray-100 text-gray-600 md:hidden"
-                      >
-                        ← Back
-                      </button>
-                    )}
                     <Editor
                       note={selectedNote}
                       notes={notes}

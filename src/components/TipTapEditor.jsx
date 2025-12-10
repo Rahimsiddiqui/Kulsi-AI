@@ -101,8 +101,8 @@ const TipTapEditor = forwardRef(
                 .join("")
                 .trim();
               return isChecked
-                ? `- [x] ${textContent}\n`
-                : `- [ ] ${textContent}\n`;
+                ? `[x] ${textContent}\n`
+                : `[ ] ${textContent}\n`;
             }
             const trimmedContent = inner.trim();
             // For list items, only output if they have content
@@ -159,31 +159,31 @@ const TipTapEditor = forwardRef(
         return `<li>${text}</li>`;
       });
 
-      // Checkboxes/Task lists FIRST (before regular unordered lists)
-      // Unchecked: - [ ] text or - [ ]
-      html = html.replace(/^[\-\*]\s*\[\s*\]\s*(.*)$/gm, (match, text) => {
-        return `<li data-type="taskItem" data-checked="false"><input type="checkbox"><p>${
-          text.trim() || ""
-        }</p></li>`;
+      // Unchecked: [ ] text
+      html = html.replace(/^\[\s*\]\s*(.*)$/gm, (match, text) => {
+        const content = text.trim();
+        return `<li data-type="taskItem" data-checked="false"><label><input type="checkbox">${
+          content ? `<span>${content}</span>` : "<span></span>"
+        }</label></li>`;
       });
-      // Checked: - [x] text or - [x]
-      html = html.replace(/^[\-\*]\s*\[x\]\s*(.*)$/gim, (match, text) => {
-        return `<li data-type="taskItem" data-checked="true"><input type="checkbox" checked><p>${
-          text.trim() || ""
-        }</p></li>`;
+      // Checked: [x] text
+      html = html.replace(/^\[x\]\s*(.*)$/gim, (match, text) => {
+        const content = text.trim();
+        return `<li data-type="taskItem" data-checked="true"><label><input type="checkbox" checked>${
+          content ? `<span>${content}</span>` : "<span></span>"
+        }</label></li>`;
       });
-      // Wrap consecutive task items - fix the regex to properly match individual items
+
+      // Wrap consecutive task items into a task-list <ul> with data-type="taskList"
       html = html.replace(
-        /(<li data-type="taskItem"[^>]*>.*?<\/li>)+/g,
+        /((?:<li data-type="taskItem"[^>]*>[\s\S]*?<\/li>\s*)+)/g,
         (match) => {
-          // Remove trailing newline before wrapping
           const trimmed = match.trim();
-          return `<ul>${trimmed}</ul>`;
+          return `<ul data-type="taskList">${trimmed}</ul>`;
         }
       );
 
-      // Unordered lists (-, *) - ONLY regular items (exclude anything with [ ] or [x])
-      // Must come AFTER task list processing so task items aren't matched here
+      // --- Regular unordered list items (- or *) — do this after task items so they aren't matched ---
       html = html.replace(
         /^[\-\*]\s+(?!\[[\s\]xX\]])(.*?)$/gm,
         (match, text) => {
@@ -191,30 +191,38 @@ const TipTapEditor = forwardRef(
         }
       );
 
-      // Wrap consecutive list items
-      html = html.replace(/(<li(?:\s+[^>]*)?>[^<]*<\/li>\n)+/g, (match) => {
-        return `<ul>${match}</ul>`;
-      });
+      // Wrap consecutive regular list items (but exclude any <li> that already has data-type)
+      html = html.replace(
+        /((?:<li(?![^>]*data-type)[^>]*>[\s\S]*?<\/li>\s*)+)/g,
+        (match) => {
+          return `<ul>${match.trim()}</ul>`;
+        }
+      );
+
+      // Clean up empty list items and empty task items
+      html = html.replace(
+        /<li[^>]*>\s*<label>\s*<input[^>]*>\s*<span>\s*<\/span>\s*<\/label>\s*<\/li>/g,
+        ""
+      );
+      html = html.replace(/<li[^>]*>\s*<\/li>/g, "");
 
       // Blockquotes
       html = html.replace(/^>\s+(.+)$/gm, (match, text) => {
         return `<blockquote>${text}</blockquote>`;
       });
 
-      // Bold & Italic (order matters: *** before ** and *)
+      // Bold & Italic (order matters)
       html = html.replace(/\*\*\*(.*?)\*\*\*/g, "<strong><em>$1</em></strong>");
       html = html.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
       html = html.replace(/__(.*?)__/g, "<u>$1</u>");
       html = html.replace(/\*(.*?)\*/g, "<em>$1</em>");
       html = html.replace(/~~(.*?)~~/g, "<s>$1</s>");
 
-      // Inline code (before links to avoid conflicts)
+      // Inline code
       html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
 
-      // Links [text](url)
+      // Links + Images
       html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
-
-      // Images ![alt](url)
       html = html.replace(
         /!\[([^\]]*)\]\(([^)]+)\)/g,
         '<img src="$2" alt="$1" />'
@@ -234,9 +242,8 @@ const TipTapEditor = forwardRef(
         })
         .join("");
 
-      // Clean up any stray list items that just contain a hyphen
+      // Remove empty <ul> / <li> leftovers
       html = html.replace(/<li>[\s\-]*<\/li>/g, "");
-      // Remove empty <ul> tags
       html = html.replace(/<ul>\s*<\/ul>/g, "");
 
       return html;
@@ -247,13 +254,43 @@ const TipTapEditor = forwardRef(
         StarterKit.configure({
           paragraph: {
             HTMLAttributes: {
-              class: "mb-3 leading-8 text-gray-800",
+              class: "leading-8 text-gray-800",
             },
           },
           heading: {
             levels: [1, 2, 3, 4, 5, 6],
             HTMLAttributes: {
-              class: "font-bold text-gray-900 mt-4 mb-2",
+              class: "font-bold text-gray-900 mt-8 mb-7",
+            },
+          },
+          h1: {
+            HTMLAttributes: {
+              class: "text-5xl font-bold text-gray-900 mt-8 mb-7",
+            },
+          },
+          h2: {
+            HTMLAttributes: {
+              class: "text-4.5xl font-bold text-gray-900 mt-8 mb-7",
+            },
+          },
+          h3: {
+            HTMLAttributes: {
+              class: "text-4xl font-bold text-gray-900 mt-8 mb-7",
+            },
+          },
+          h4: {
+            HTMLAttributes: {
+              class: "text-3.5xl font-bold text-gray-900 mt-8 mb-7",
+            },
+          },
+          h5: {
+            HTMLAttributes: {
+              class: "text-3xl font-bold text-gray-900 mt-8 mb-7",
+            },
+          },
+          h6: {
+            HTMLAttributes: {
+              class: "text-2.5xl font-bold text-gray-900 mt-8 mb-7",
             },
           },
           bulletList: {
@@ -287,11 +324,13 @@ const TipTapEditor = forwardRef(
         }),
         TaskList.configure({
           HTMLAttributes: {
-            class: "ml-4 space-y-2 list-none",
+            "data-type": "taskList",
+            class: "ml-2 space-y-2 list-none",
           },
         }),
         TaskItem.configure({
           HTMLAttributes: {
+            "data-type": "taskItem",
             class: "flex items-center gap-2",
           },
           nested: true,
@@ -505,6 +544,11 @@ const TipTapEditor = forwardRef(
 
     return (
       <div className="relative w-full">
+        <style>{`
+          .ProseMirror::selection {
+            background-color: rgba(99, 102, 241, 0.2);
+          }
+        `}</style>
         <EditorContent
           editor={editor}
           className="ProseMirror w-full"
