@@ -259,37 +259,37 @@ const TipTapEditor = forwardRef(
           heading: {
             levels: [1, 2, 3, 4, 5, 6],
             HTMLAttributes: {
-              class: "font-bold text-gray-900 mt-12 mb-7",
+              class: "font-bold text-gray-900 mt-8 mb-7",
             },
           },
           h1: {
             HTMLAttributes: {
-              class: "text-5xl font-bold text-gray-900 mt-12 mb-7",
+              class: "text-5xl font-bold text-gray-900 mt-8 mb-7",
             },
           },
           h2: {
             HTMLAttributes: {
-              class: "text-4.5xl font-bold text-gray-900 mt-12 mb-7",
+              class: "text-4.5xl font-bold text-gray-900 mt-8 mb-7",
             },
           },
           h3: {
             HTMLAttributes: {
-              class: "text-4xl font-bold text-gray-900 mt-12 mb-7",
+              class: "text-4xl font-bold text-gray-900 mt-8 mb-7",
             },
           },
           h4: {
             HTMLAttributes: {
-              class: "text-3.5xl font-bold text-gray-900 mt-12 mb-7",
+              class: "text-3.5xl font-bold text-gray-900 mt-8 mb-7",
             },
           },
           h5: {
             HTMLAttributes: {
-              class: "text-3xl font-bold text-gray-900 mt-12 mb-7",
+              class: "text-3xl font-bold text-gray-900 mt-8 mb-7",
             },
           },
           h6: {
             HTMLAttributes: {
-              class: "text-2.5xl font-bold text-gray-900 mt-12 mb-7",
+              class: "text-2.5xl font-bold text-gray-900 mt-8 mb-7",
             },
           },
           bulletList: {

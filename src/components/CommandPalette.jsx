@@ -36,12 +36,12 @@ const CommandPalette = ({
     {
       type: "action",
       id: "new-note",
-      label: query.trim() ? `Create note "${query}"` : "Create New Note",
+      label: query ? `Create note "${query}"` : "Create New Note",
       icon: Plus,
       action: () => {
         // If user typed something, use it as the title
-        if (query.trim()) {
-          onCreateNote(query.trim());
+        if (query) {
+          onCreateNote(query);
         } else {
           onCreateNote();
         }
@@ -134,7 +134,7 @@ const CommandPalette = ({
                     item.action();
                     onClose();
                   }}
-                  className={`w-full text-left px-4 py-3 flex items-center justify-between transition-colors ${
+                  className={`cursor-pointer w-full text-left px-4 py-3 flex items-center justify-between transition-colors ${
                     idx === selectedIndex
                       ? "bg-indigo-50 text-indigo-900"
                       : "text-gray-700 hover:bg-gray-50"
@@ -164,14 +164,13 @@ const CommandPalette = ({
           )}
         </div>
 
-        <div className="bg-gray-50 px-4 py-2 text-xs text-gray-400 border-t border-gray-100 flex justify-between">
+        <div className="bg-gray-50 px-4 py-2 text-xs text-gray-400 border-t border-gray-100 flex justify-center">
           <span>
-            ProTip: Use{" "}
+            Tip: Use{" "}
             <kbd className="font-mono bg-white px-1 border rounded">Up</kbd>{" "}
             <kbd className="font-mono bg-white px-1 border rounded">Down</kbd>{" "}
             to navigate
           </span>
-          <span>Kulsi AI Command</span>
         </div>
       </div>
     </div>

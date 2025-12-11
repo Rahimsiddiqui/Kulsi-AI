@@ -5,7 +5,7 @@ import React, {
   useCallback,
   Suspense,
 } from "react";
-import { Menu } from "lucide-react";
+import { Menu, Sparkles } from "lucide-react";
 import CircularProgress from "@mui/material/CircularProgress";
 import { ToastContainer, Zoom } from "react-toastify";
 
@@ -283,7 +283,7 @@ const AppContent = () => {
               <div className="h-14 border-b border-gray-100 flex items-center justify-between px-4 bg-white/80 backdrop-blur z-30 shrink-0">
                 <button
                   onClick={() => setSidebarOpen(true)}
-                  className="p-2 -ml-2 text-gray-600"
+                  className="cursor-pointer p-2 -ml-2 text-gray-600"
                 >
                   <Menu className="w-6 h-6" />
                 </button>
@@ -351,8 +351,8 @@ const AppContent = () => {
                       {!isNoteListOpen && (
                         <button
                           onClick={() => setIsNoteListOpen(true)}
-                          className="p-2 bg-white shadow rounded-lg hover:bg-gray-50 text-gray-600"
-                          title="Open List"
+                          className="cursor-pointer p-2 bg-white shadow rounded-lg hover:bg-gray-50 text-gray-600"
+                          aria-label="Open note list"
                         >
                           <Menu className="w-5 h-5 rotate-180" />
                         </button>
@@ -360,7 +360,9 @@ const AppContent = () => {
                     </div>
 
                     <div className="w-24 h-24 bg-linear-to-br from-indigo-50 to-white rounded-3xl shadow-sm border border-indigo-50 flex items-center justify-center mb-4">
-                      <span className="text-6xl">✨</span>
+                      <span className="text-6xl">
+                        <Sparkles className="w-14 h-14 text-yellow-400 fill-current" />
+                      </span>
                     </div>
                     <h3 className="text-xl font-bold text-gray-900">
                       Welcome to Kulsi AI
@@ -383,7 +385,7 @@ const AppContent = () => {
                     {!sidebarOpen && !isDesktop && (
                       <button
                         onClick={() => setSidebarOpen(true)}
-                        className="p-2 bg-white shadow rounded-lg hover:bg-gray-50"
+                        className="cursor-pointer p-2 bg-white shadow rounded-lg hover:bg-gray-50"
                       >
                         <Menu className="w-5 h-5 text-gray-600" />
                       </button>
@@ -411,7 +413,7 @@ const AppContent = () => {
                     {!sidebarOpen && !isDesktop && (
                       <button
                         onClick={() => setSidebarOpen(true)}
-                        className="p-2 bg-white shadow rounded-lg hover:bg-gray-50"
+                        className="cursor-pointer p-2 bg-white shadow rounded-lg hover:bg-gray-50"
                       >
                         <Menu className="w-5 h-5 text-gray-600" />
                       </button>
@@ -429,7 +431,7 @@ const AppContent = () => {
                       <button
                         onClick={generateFlashcardsForView}
                         disabled={isGeneratingFlashcards}
-                        className="bg-indigo-600 text-white px-6 py-3 rounded-xl shadow-lg hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2 mx-auto transition-transform active:scale-95"
+                        className="cursor-pointer bg-indigo-600 text-white px-6 py-3 rounded-xl shadow-lg hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2 mx-auto transition-transform active:scale-95"
                       >
                         {isGeneratingFlashcards
                           ? "Generating..."

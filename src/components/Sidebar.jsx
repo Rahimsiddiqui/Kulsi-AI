@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import { FolderType } from "../../server/config/types.js";
 import { INITIAL_FOLDERS } from "../../server/config/constants.js";
 import {
@@ -12,6 +13,7 @@ import {
   Settings,
   Network,
   CreditCard,
+  Notebook,
   Crown,
   ChevronsLeft,
   ChevronsRight,
@@ -37,41 +39,106 @@ const NavItem = ({
   highlight = false,
   isCollapsed,
 }) => (
-  <button
-    onClick={onClick}
-    title={isCollapsed ? label : undefined}
-    className={`w-full flex items-center ${
-      isCollapsed ? "justify-center px-0" : "justify-between px-3"
-    } py-2.5 text-sm font-medium rounded-xl transition-all duration-200 group ${
-      isActive
-        ? "bg-white text-indigo-600 shadow-sm ring-1 ring-gray-100"
-        : "text-gray-600 hover:bg-gray-100/80 hover:text-gray-900"
-    }`}
-  >
-    <div
-      className={`flex items-center ${
-        isCollapsed ? "justify-center" : "space-x-3"
+  <SidebarTooltip text={label} isCollapsed={isCollapsed} alwaysShow={true}>
+    <button
+      onClick={onClick}
+      className={`cursor-pointer w-full flex items-center ${
+        isCollapsed ? "justify-center px-0" : "justify-between px-3"
+      } py-2.5 text-sm font-medium rounded-xl transition-all duration-200 group ${
+        isActive
+          ? "bg-white text-indigo-600 shadow-sm ring-1 ring-gray-100"
+          : "text-gray-600 hover:bg-gray-100/80 hover:text-gray-900"
       }`}
+      aria-label={label}
     >
-      <Icon
-        className={`w-4 h-4 transition-colors ${
-          isActive
-            ? highlight
-              ? "text-amber-500"
-              : "text-indigo-600"
-            : "text-gray-400 group-hover:text-gray-500"
+      <div
+        className={`flex items-center ${
+          isCollapsed ? "justify-center" : "space-x-3"
         }`}
-      />
-      {!isCollapsed && <span>{label}</span>}
-    </div>
-    {isActive && !isCollapsed && (
-      <motion.div
-        layoutId="activeDot"
-        className="w-1.5 h-1.5 bg-indigo-600 rounded-full"
-      />
-    )}
-  </button>
+      >
+        <Icon
+          className={`w-4 h-4 transition-colors ${
+            isActive
+              ? highlight
+                ? "text-amber-500"
+                : "text-indigo-600"
+              : "text-gray-400 group-hover:text-gray-500"
+          }`}
+        />
+        {!isCollapsed && <span>{label}</span>}
+      </div>
+      {isActive && !isCollapsed && (
+        <motion.div
+          layoutId="activeDot"
+          className="w-1.5 h-1.5 bg-indigo-600 rounded-full"
+        />
+      )}
+    </button>
+  </SidebarTooltip>
 );
+
+// Sidebar Tooltip Helper Component
+const SidebarTooltip = ({
+  text,
+  children,
+  isCollapsed,
+  alwaysShow = false,
+}) => {
+  const [showTooltip, setShowTooltip] = useState(false);
+  const [buttonRect, setButtonRect] = useState(null);
+  const buttonRef = useRef(null);
+  const tooltipTimeoutRef = useRef(null);
+
+  const handleMouseEnter = () => {
+    // Show if alwaysShow is true, or if sidebar is collapsed
+    if (!alwaysShow && !isCollapsed) return;
+    if (buttonRef.current) {
+      setButtonRect(buttonRef.current.getBoundingClientRect());
+    }
+    tooltipTimeoutRef.current = setTimeout(() => {
+      setShowTooltip(true);
+    }, 500);
+  };
+
+  const handleMouseLeave = () => {
+    setShowTooltip(false);
+    if (tooltipTimeoutRef.current) {
+      clearTimeout(tooltipTimeoutRef.current);
+    }
+  };
+
+  return (
+    <>
+      <div
+        ref={buttonRef}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
+        {children}
+      </div>
+
+      {showTooltip &&
+        buttonRect &&
+        text &&
+        createPortal(
+          <div
+            className="fixed bg-gray-900 text-white text-xs px-2.5 py-1.5 rounded shadow-lg pointer-events-none"
+            style={{
+              top: `${buttonRect.top + buttonRect.height / 2}px`,
+              left: `${buttonRect.right + 12}px`,
+              transform: "translateY(-50%)",
+              animation: "fadeIn 0.3s ease-out forwards",
+              whiteSpace: "nowrap",
+              zIndex: 9999,
+            }}
+          >
+            {text}
+          </div>,
+          document.body
+        )}
+    </>
+  );
+};
 
 const Sidebar = ({
   activeFolder,
@@ -101,19 +168,26 @@ const Sidebar = ({
       >
         {/* Toggle Button for Desktop Mini Mode */}
         {!isMobile && isCollapsed && (
-          <button
-            onClick={onToggle}
-            className="p-1.5 hover:bg-gray-200/50 rounded-lg text-gray-400 hover:text-gray-600 transition-colors mb-2"
+          <SidebarTooltip
+            text="Expand sidebar"
+            isCollapsed={isCollapsed}
+            alwaysShow={true}
           >
-            <ChevronsRight className="w-5 h-5" />
-          </button>
+            <button
+              onClick={onToggle}
+              className="cursor-pointer p-1.5 hover:bg-gray-200/50 rounded-lg text-gray-400 hover:text-gray-600 transition-colors mb-2"
+              aria-label="Expand sidebar"
+            >
+              <ChevronsRight className="w-5 h-5" />
+            </button>
+          </SidebarTooltip>
         )}
 
         {/* Logo Area - Hidden when collapsed */}
         {!isCollapsed && (
           <div className="flex items-center space-x-2 text-indigo-600 font-bold text-lg tracking-tight">
-            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-200">
-              <Layout className="w-5 h-5 text-white" />
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center">
+              <Notebook className="w-6 h-6 text-primary" />
             </div>
             <span className="text-gray-900">Kulsi AI</span>
           </div>
@@ -121,28 +195,40 @@ const Sidebar = ({
 
         {/* Desktop Collapse Button (Expanded State) */}
         {!isMobile && !isCollapsed && (
-          <button
-            onClick={onToggle}
-            className="p-1.5 hover:bg-gray-200/50 rounded-lg text-gray-400 hover:text-gray-600 transition-colors"
-            title="Collapse Sidebar"
+          <SidebarTooltip
+            text="Collapse sidebar"
+            isCollapsed={isCollapsed}
+            alwaysShow={true}
           >
-            <ChevronsLeft className="w-5 h-5" />
-          </button>
+            <button
+              onClick={onToggle}
+              className="cursor-pointer p-1.5 hover:bg-gray-200/50 rounded-lg text-gray-400 hover:text-gray-600 transition-colors"
+              aria-label="Collapse sidebar"
+            >
+              <ChevronsLeft className="w-5 h-5" />
+            </button>
+          </SidebarTooltip>
         )}
       </div>
 
       <div className={`px-4 pb-6 ${isCollapsed ? "px-2" : ""}`}>
-        <motion.button
-          whileTap={{ scale: 0.98 }}
-          onClick={onCreateNote}
-          title={isCollapsed ? "New Note" : undefined}
-          className={`w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 ${
-            isCollapsed ? "px-0" : "px-4"
-          } rounded-xl flex items-center justify-center space-x-1 transition-all shadow-lg shadow-indigo-200 hover:shadow-indigo-300`}
+        <SidebarTooltip
+          text="New Note"
+          isCollapsed={isCollapsed}
+          alwaysShow={true}
         >
-          <Plus className="w-5 h-5" />
-          {!isCollapsed && <span>New Note</span>}
-        </motion.button>
+          <motion.button
+            whileTap={{ scale: 0.98 }}
+            onClick={onCreateNote}
+            className={`cursor-pointer w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 ${
+              isCollapsed ? "px-0" : "px-4"
+            } rounded-xl flex items-center justify-center space-x-1 transition-all shadow-lg shadow-indigo-200 hover:shadow-indigo-300`}
+            aria-label="Create new note"
+          >
+            <Plus className="w-5 h-5" />
+            {!isCollapsed && <span>New Note</span>}
+          </motion.button>
+        </SidebarTooltip>
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 space-y-1 custom-scrollbar">
@@ -212,30 +298,6 @@ const Sidebar = ({
             isCollapsed={isCollapsed}
           />
         ))}
-
-        <div
-          className={`mt-8 pt-4 ${
-            isCollapsed ? "" : "border-t border-gray-200/50"
-          }`}
-        >
-          <button
-            onClick={() => {
-              onSelectFolder(FolderType.TRASH);
-              onSelectView("notes");
-            }}
-            title={isCollapsed ? "Trash" : undefined}
-            className={`w-full flex items-center ${
-              isCollapsed ? "justify-center" : "space-x-3"
-            } px-3 py-2.5 text-sm font-medium rounded-xl transition-colors ${
-              currentView === "notes" && activeFolder === FolderType.TRASH
-                ? "bg-red-50 text-red-600"
-                : "text-gray-600 hover:bg-red-50 hover:text-red-600"
-            }`}
-          >
-            <Trash2 className="w-4 h-4" />
-            {!isCollapsed && <span>Trash</span>}
-          </button>
-        </div>
       </nav>
 
       <div
@@ -244,41 +306,55 @@ const Sidebar = ({
         }`}
       >
         {userPlan === "free" && (
-          <motion.div
-            whileHover={{ scale: 1.02 }}
-            onClick={onOpenSubscription}
-            className={`bg-linear-to-r from-indigo-500 to-purple-600 rounded-xl ${
-              isCollapsed ? "p-2" : "p-3"
-            } text-white cursor-pointer shadow-md mb-3`}
-            title={isCollapsed ? "Go Pro" : undefined}
+          <SidebarTooltip
+            text="Go Pro"
+            isCollapsed={isCollapsed}
+            alwaysShow={true}
           >
-            {isCollapsed ? (
-              <Crown className="w-4 h-4 mx-auto" />
-            ) : (
-              <>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-bold uppercase tracking-wide flex items-center gap-1">
-                    <Crown className="w-3 h-3" /> Go Pro
-                  </span>
-                </div>
-                <p className="text-xs text-indigo-100 leading-tight">
-                  Unlock AI, Sync & more.
-                </p>
-              </>
-            )}
-          </motion.div>
+            <motion.div
+              whileHover={{ scale: 1.02 }}
+              onClick={onOpenSubscription}
+              className={`bg-linear-to-r from-indigo-500 to-purple-600 rounded-xl ${
+                isCollapsed ? "p-2" : "p-3"
+              } text-white cursor-pointer shadow-md mb-3`}
+              role="button"
+              tabIndex={0}
+              aria-label="Go Pro"
+            >
+              {isCollapsed ? (
+                <Crown className="w-4 h-4 mx-auto" />
+              ) : (
+                <>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-bold uppercase tracking-wide flex items-center gap-1">
+                      <Crown className="w-3 h-3" /> Go Pro
+                    </span>
+                  </div>
+                  <p className="text-xs text-indigo-100 leading-tight">
+                    Unlock AI, Sync & more.
+                  </p>
+                </>
+              )}
+            </motion.div>
+          </SidebarTooltip>
         )}
 
-        <button
-          onClick={onOpenSettings}
-          title={isCollapsed ? "Settings" : undefined}
-          className={`flex items-center ${
-            isCollapsed ? "justify-center" : "space-x-3"
-          } text-gray-600 hover:text-gray-900 text-sm font-medium w-full px-3 py-2 rounded-xl hover:bg-white hover:shadow-sm transition-all border border-transparent hover:border-gray-100`}
+        <SidebarTooltip
+          text="Settings"
+          isCollapsed={isCollapsed}
+          alwaysShow={true}
         >
-          <Settings className="w-4 h-4" />
-          {!isCollapsed && <span>Settings</span>}
-        </button>
+          <button
+            onClick={onOpenSettings}
+            className={`cursor-pointer flex items-center ${
+              isCollapsed ? "justify-center" : "space-x-3"
+            } text-gray-600 hover:text-gray-900 text-sm font-medium w-full px-3 py-2 rounded-xl hover:bg-white hover:shadow-sm transition-all border border-transparent hover:border-gray-100`}
+            aria-label="Settings"
+          >
+            <Settings className="w-4 h-4" />
+            {!isCollapsed && <span>Settings</span>}
+          </button>
+        </SidebarTooltip>
       </div>
     </div>
   );

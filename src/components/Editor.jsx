@@ -26,6 +26,7 @@ import {
   Redo,
   Link as LinkIcon,
   PanelLeftOpen,
+  Copy,
 } from "lucide-react";
 import { generateNoteEnhancement } from "../services/geminiService";
 import { format } from "date-fns";
@@ -66,6 +67,7 @@ const Editor = ({
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [aiMenuOpen, setAiMenuOpen] = useState(false);
   const [showDrawingModal, setShowDrawingModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // History stack state
   const [history, setHistory] = useState([ensureString(note.content)]);
@@ -172,7 +174,10 @@ const Editor = ({
   const undo = useCallback(() => {
     setHistoryIndex((idx) => {
       const newIndex = Math.max(0, idx - 1);
-      setContent((_) => history[newIndex] ?? "");
+      if (newIndex >= 0 && history.length > newIndex) {
+        const previousContent = history[newIndex];
+        setContent(previousContent);
+      }
       return newIndex;
     });
   }, [history]);
@@ -180,15 +185,74 @@ const Editor = ({
   const redo = useCallback(() => {
     setHistoryIndex((idx) => {
       const newIndex = Math.min(history.length - 1, idx + 1);
-      setContent((_) => history[newIndex] ?? "");
+      if (newIndex < history.length) {
+        const nextContent = history[newIndex];
+        setContent(nextContent);
+      }
       return newIndex;
     });
   }, [history]);
 
-  const handlePaste = useCallback((e) => {
-    // TipTap handles paste automatically, converting HTML to markdown
-    // This is here for any custom paste logic if needed
-  }, []);
+  const handlePaste = useCallback(
+    (e) => {
+      // Get pasted text from clipboard
+      const pastedText = e.clipboardData?.getData("text/plain") || "";
+
+      if (!pastedText) return;
+
+      // Check if pasted content has markdown markup
+      const hasMarkdown = /(\*\*|__|\*|_|~~|`|^#|^\d+\.|^-\s|\[x?\]|>)/m.test(
+        pastedText
+      );
+
+      if (hasMarkdown) {
+        // Prevent default paste behavior
+        e.preventDefault();
+
+        // Insert the pasted markdown content into the editor
+        // TipTap will automatically parse markdown and convert to rich text
+        if (tiptapRef.current) {
+          // Get current editor state and insert at cursor position
+          tiptapRef.current.insertText("", "");
+          // Insert the pasted content which will be parsed as markdown
+          const currentContent = content || "";
+          updateContentWithHistory(currentContent + "\n" + pastedText);
+          toast.success("Markdown pasted and converted!");
+        }
+      }
+      // If no markdown detected, let TipTap handle it normally
+    },
+    [content, updateContentWithHistory]
+  );
+
+  const handleCopy = useCallback(() => {
+    // Copy the content WITH markup AND preserve all whitespace (including trailing spaces)
+    if (content) {
+      try {
+        // Don't trim - preserve exact content with all spaces
+        const contentToCopy = content;
+
+        navigator.clipboard
+          .writeText(contentToCopy)
+          .then(() => {
+            toast.success("Content successfully copied!");
+          })
+          .catch(() => {
+            // Fallback for older browsers
+            const textarea = document.createElement("textarea");
+            textarea.value = contentToCopy;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand("copy");
+            document.body.removeChild(textarea);
+            toast.success("Content successfully copied!");
+          });
+      } catch (error) {
+        toast.error("Failed to copy content");
+        console.error("Copy failed:", error);
+      }
+    }
+  }, [content]);
 
   const handleAiAction = useCallback(
     async (action) => {
@@ -306,6 +370,16 @@ const Editor = ({
         e.preventDefault();
         tiptapRef.current?.toggleTaskList();
       }
+      // Copy with Markup: Ctrl/Cmd + C (standard copy, but copy markdown with markup)
+      else if (modKey && e.key === "c" && !e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        handleCopy();
+      }
+      // Copy with Markup: Ctrl/Cmd + Alt + C (alternative shortcut)
+      else if (modKey && e.altKey && e.key === "c") {
+        e.preventDefault();
+        handleCopy();
+      }
       // Bullet List: Ctrl/Cmd + Shift + L
       else if (modKey && e.shiftKey && e.key === "L") {
         e.preventDefault();
@@ -327,7 +401,7 @@ const Editor = ({
         redo();
       }
     },
-    [undo, redo]
+    [undo, redo, handleCopy]
   );
 
   // Global keyboard shortcuts listener
@@ -883,6 +957,90 @@ const Editor = ({
     [parseInline]
   );
 
+  // Action button helper with tooltip - for top-right action icons
+  const ActionBtn = ({
+    onClick,
+    icon: Icon,
+    tooltip,
+    ariaLabel,
+    disabled = false,
+    className = "",
+    tooltipPosition = "right", // "right" or "bottom"
+  }) => {
+    const [showTooltip, setShowTooltip] = useState(false);
+    const [buttonRect, setButtonRect] = useState(null);
+    const buttonRef = useRef(null);
+    const tooltipTimeoutRef = useRef(null);
+
+    const handleMouseEnter = () => {
+      if (buttonRef.current) {
+        setButtonRect(buttonRef.current.getBoundingClientRect());
+      }
+      tooltipTimeoutRef.current = setTimeout(() => {
+        setShowTooltip(true);
+      }, 500);
+    };
+
+    const handleMouseLeave = () => {
+      setShowTooltip(false);
+      if (tooltipTimeoutRef.current) {
+        clearTimeout(tooltipTimeoutRef.current);
+      }
+    };
+
+    const getTooltipPosition = () => {
+      if (!buttonRect) return {};
+      if (tooltipPosition === "bottom") {
+        return {
+          top: `${buttonRect.bottom + 8}px`,
+          left: `${buttonRect.left + buttonRect.width / 2}px`,
+          transform: "translateX(-50%)",
+        };
+      }
+      // default "right"
+      return {
+        top: `${buttonRect.top + buttonRect.height / 2}px`,
+        left: `${buttonRect.right + 12}px`,
+        transform: "translateY(-50%)",
+      };
+    };
+
+    return (
+      <>
+        <button
+          ref={buttonRef}
+          onClick={onClick}
+          disabled={disabled}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+          aria-label={ariaLabel}
+          className={`cursor-pointer transition-colors pointer-events-auto ${className}`}
+          type="button"
+        >
+          <Icon className="w-4 h-4" />
+        </button>
+
+        {showTooltip &&
+          buttonRect &&
+          tooltip &&
+          createPortal(
+            <div
+              className="fixed bg-gray-900 text-white text-xs px-2.5 py-1.5 rounded shadow-lg pointer-events-none"
+              style={{
+                ...getTooltipPosition(),
+                animation: "fadeIn 0.3s ease-out forwards",
+                whiteSpace: "nowrap",
+                zIndex: 9999,
+              }}
+            >
+              {tooltip}
+            </div>,
+            document.body
+          )}
+      </>
+    );
+  };
+
   // Toolbar button helper
   const ToolbarBtn = ({
     onClick,
@@ -933,7 +1091,7 @@ const Editor = ({
           }}
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
-          className={`p-2.5 rounded-lg transition-all active:scale-95 shrink-0 ${
+          className={`cursor-pointer p-2.5 rounded-lg transition-all active:scale-95 shrink-0 ${
             active
               ? "bg-indigo-100 text-indigo-700 shadow-sm"
               : "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
@@ -1075,7 +1233,7 @@ const Editor = ({
           onClick={handleButtonClick}
           onMouseEnter={handleButtonMouseEnter}
           onMouseLeave={handleButtonMouseLeave}
-          className="p-2.5 rounded-lg transition-all active:scale-95 shrink-0 text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+          className="cursor-pointer p-2.5 rounded-lg transition-all active:scale-95 shrink-0 text-gray-600 hover:bg-gray-200 hover:text-gray-900"
           aria-label="Select Heading"
           type="button"
         >
@@ -1118,7 +1276,7 @@ const Editor = ({
                       }
                     }}
                     onMouseLeave={() => setHoveredHeading(null)}
-                    className={`px-3 py-2 text-left text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 ${
+                    className={`cursor-pointer px-3 py-2 text-left text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 ${
                       heading.diffClass1
                         ? "rounded-t-lg"
                         : heading.diffClass2 && "rounded-b-lg"
@@ -1178,6 +1336,61 @@ const Editor = ({
     >
       {showDrawingModal && <DrawingModal />}
 
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm &&
+        createPortal(
+          <AnimatePresence>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50"
+              onClick={() => setShowDeleteConfirm(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm mx-4"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-center w-12 h-12 bg-red-100 rounded-full mx-auto mb-4">
+                  <Trash2 className="w-6 h-6 text-red-600" />
+                </div>
+
+                <h3 className="text-lg font-semibold text-gray-900 text-center mb-2">
+                  Delete note?
+                </h3>
+
+                <p className="text-sm text-gray-600 text-center mb-6">
+                  This action cannot be undone. The note "{title || "Untitled"}"
+                  will be permanently deleted.
+                </p>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowDeleteConfirm(false)}
+                    className="cursor-pointer flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowDeleteConfirm(false);
+                      onDelete(note.id);
+                    }}
+                    className="cursor-pointer flex-1 px-4 py-2.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          </AnimatePresence>,
+          document.body
+        )}
+
       {/* Header */}
       <div className="flex items-center justify-between px-4 md:px-6 py-3 border-b border-gray-100 bg-white/95 backdrop-blur z-20 sticky top-0">
         <div className="flex items-center space-x-3 overflow-hidden">
@@ -1185,8 +1398,7 @@ const Editor = ({
             {!isNoteListOpen && (
               <button
                 onClick={onToggleNoteList}
-                className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                title="Open Note List"
+                className="cursor-pointer p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
                 aria-label="Open note list"
               >
                 <PanelLeftOpen className="w-4 h-4" />
@@ -1209,46 +1421,53 @@ const Editor = ({
           <div className="h-6 w-px bg-gray-200 hidden md:block" />
 
           <div className="flex items-center space-x-1">
-            <button
+            <ActionBtn
               onClick={undo}
+              icon={Undo}
               disabled={historyIndex <= 0}
-              className="p-2 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-700 disabled:opacity-30 transition-colors"
-              aria-label="Undo (Cmd+Z)"
-              title="Undo"
-            >
-              <Undo className="w-4 h-4" />
-            </button>
-            <button
+              tooltip="Undo (Cmd/Ctrl+Z)"
+              ariaLabel="Undo (Cmd/Ctrl+Z)"
+              className="p-2 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-700 disabled:opacity-30"
+            />
+            <ActionBtn
               onClick={redo}
+              icon={Redo}
               disabled={historyIndex >= history.length - 1}
-              className="p-2 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-700 disabled:opacity-30 transition-colors"
-              aria-label="Redo (Cmd+Shift+Z)"
-              title="Redo"
-            >
-              <Redo className="w-4 h-4" />
-            </button>
+              tooltip="Redo (Cmd/Ctrl+Shift+Z)"
+              ariaLabel="Redo (Cmd/Ctrl+Shift+Z)"
+              tooltipPosition="bottom"
+              className="p-2 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-700 disabled:opacity-30"
+            />
           </div>
 
-          <button
+          <ActionBtn
             onClick={() => onUpdate(note.id, { isPinned: !note.isPinned })}
-            className={`p-2 rounded-full hover:bg-gray-100 transition-colors ${
+            icon={Pin}
+            tooltip={note?.isPinned ? "Unpin note" : "Pin note"}
+            ariaLabel={note?.isPinned ? "Unpin note" : "Pin note"}
+            tooltipPosition="bottom"
+            className={`p-2 rounded-full hover:bg-gray-100 ${
               note?.isPinned
                 ? "text-indigo-600 bg-indigo-50"
                 : "text-gray-400 hover:text-gray-700"
             }`}
-            aria-label={note?.isPinned ? "Unpin note" : "Pin note"}
-            title={note?.isPinned ? "Unpin note" : "Pin note"}
-          >
-            <Pin className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => onDelete(note.id)}
-            className="p-2 rounded-full hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors"
-            aria-label="Delete note"
-            title="Delete note"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+          />
+          <ActionBtn
+            onClick={handleCopy}
+            icon={Copy}
+            tooltip="Copy with markup (Cmd/Ctrl+C)"
+            ariaLabel="Copy with markup"
+            tooltipPosition="bottom"
+            className="p-2 rounded-full hover:bg-blue-50 text-gray-400 hover:text-blue-600"
+          />
+          <ActionBtn
+            onClick={() => setShowDeleteConfirm(true)}
+            icon={Trash2}
+            tooltip="Delete note"
+            ariaLabel="Delete note"
+            tooltipPosition="bottom"
+            className="p-2 rounded-full hover:bg-red-50 text-gray-400 hover:text-red-600"
+          />
         </div>
       </div>
 
@@ -1362,21 +1581,21 @@ const Editor = ({
               </div>
               <button
                 onClick={() => handleAiAction("improve")}
-                className="w-full text-left px-3 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-xl flex items-center gap-3 transition-colors"
+                className="cursor-pointer w-full text-left px-3 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-xl flex items-center gap-3 transition-colors"
                 aria-label="Improve writing with AI"
               >
                 <Sparkles className="w-4 h-4" /> Improve Writing
               </button>
               <button
                 onClick={() => handleAiAction("fix_grammar")}
-                className="w-full text-left px-3 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-xl flex items-center gap-3 transition-colors"
+                className="cursor-pointer w-full text-left px-3 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-xl flex items-center gap-3 transition-colors"
                 aria-label="Fix grammar with AI"
               >
                 <CheckSquare className="w-4 h-4" /> Fix Grammar
               </button>
               <button
                 onClick={() => handleAiAction("make_todo")}
-                className="w-full text-left px-3 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-xl flex items-center gap-3 transition-colors"
+                className="cursor-pointer w-full text-left px-3 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-xl flex items-center gap-3 transition-colors"
                 aria-label="Generate to-do list from content"
               >
                 <List className="w-4 h-4" /> Generate To-Do List
@@ -1384,14 +1603,14 @@ const Editor = ({
               <div className="h-px bg-gray-100 my-1" />
               <button
                 onClick={() => handleAiAction("summarize")}
-                className="w-full text-left px-3 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-xl flex items-center gap-3 transition-colors"
+                className="cursor-pointer w-full text-left px-3 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-xl flex items-center gap-3 transition-colors"
                 aria-label="Summarize content with AI"
               >
                 <Columns className="w-4 h-4" /> Summarize
               </button>
               <button
                 onClick={() => handleAiAction("continue")}
-                className="w-full text-left px-3 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-xl flex items-center gap-3 transition-colors"
+                className="cursor-pointer w-full text-left px-3 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-xl flex items-center gap-3 transition-colors"
                 aria-label="Continue writing with AI"
               >
                 <PenTool className="w-4 h-4" /> Continue Writing
@@ -1402,11 +1621,10 @@ const Editor = ({
         <button
           onClick={() => setAiMenuOpen(!aiMenuOpen)}
           disabled={isAiLoading}
-          className={`w-14 h-14 bg-gray-900 text-white rounded-full shadow-xl shadow-gray-400/50 flex items-center justify-center transition-all transform hover:scale-105 active:scale-95 hover:bg-black ${
+          className={`cursor-pointer w-14 h-14 bg-gray-900 text-white rounded-full shadow-xl shadow-gray-400/50 flex items-center justify-center transition-all transform hover:scale-105 active:scale-95 hover:bg-black ${
             isAiLoading ? "animate-pulse cursor-wait" : ""
           }`}
           aria-label={aiMenuOpen ? "Close AI assistant" : "Open AI assistant"}
-          title={aiMenuOpen ? "Close AI assistant" : "Open AI assistant"}
         >
           <Sparkles className="w-6 h-6 text-yellow-300 fill-current" />
         </button>

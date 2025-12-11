@@ -182,27 +182,10 @@ export const useNotes = () => {
 
   const deleteNote = useCallback(
     (id) => {
-      setNotes((prev) =>
-        prev
-          .map((note) => {
-            if (note.id === id) {
-              // If already in trash, permanent delete (filter out)
-              if (note.folderId === FolderType.TRASH) {
-                return null;
-              }
-              // Move to trash
-              return {
-                ...note,
-                folderId: FolderType.TRASH,
-                updatedAt: Date.now(),
-              };
-            }
-            return note;
-          })
-          .filter(Boolean)
-      );
+      // Permanent delete - remove from local state immediately
+      setNotes((prev) => prev.filter((note) => note.id !== id));
 
-      // Async: Sync to MongoDB in background
+      // Async: Sync deletion to MongoDB in background
       (async () => {
         try {
           const note = notes.find((n) => n.id === id);
@@ -212,6 +195,8 @@ export const useNotes = () => {
         } catch (error) {
           console.error("Failed to sync note deletion to MongoDB:", error);
           setSyncError("Failed to delete note on server");
+          // Optionally, restore the note locally if MongoDB deletion fails
+          // For now, just log the error
         }
       })();
     },
