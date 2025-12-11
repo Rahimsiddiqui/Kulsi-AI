@@ -151,7 +151,7 @@ const AuthForm = ({ onLogin, onNeedsVerification }) => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4 relative overflow-y-auto">
+    <div className="min-h-screen flex items-center justify-center bg-background relative overflow-x-hidden">
       {/* Decorative Background */}
       <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-blue-100 rounded-full blur-[100px] pointer-events-none opacity-60"></div>
       <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-indigo-100 rounded-full blur-[100px] pointer-events-none opacity-60"></div>
@@ -371,7 +371,7 @@ const AuthForm = ({ onLogin, onNeedsVerification }) => {
           <button
             type="submit"
             disabled={loading || !isFormValid}
-            className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition-all transform hover:scale-[1.01] active:scale-[0.98] shadow-lg shadow-primary/20 mt-4 disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed disabled:hover:scale-100 disabled:shadow-none"
+            className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition-all transform hover:scale-[1.01] active:scale-[0.98] shadow-lg shadow-primary/20 mt-4 disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed disabled:hover:scale-100 disabled:shadow-none cursor-pointer"
             aria-label={
               loading
                 ? isLogin
@@ -413,7 +413,7 @@ const AuthForm = ({ onLogin, onNeedsVerification }) => {
                 type="button"
                 onClick={() => handleOAuthConnect("Google")}
                 disabled={loading}
-                className="w-full flex items-center justify-center gap-2 bg-surfaceHighlight hover:bg-surface border border-border text-textMain font-medium py-2.5 rounded-xl transition-all transform hover:scale-[1.01] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                className="w-full flex items-center justify-center gap-2 bg-surfaceHighlight hover:bg-surface border border-border text-textMain font-medium py-2.5 rounded-xl transition-all transform hover:scale-[1.01] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 cursor-pointer"
               >
                 <GoogleIcon />
                 <span className="text-sm">Google</span>
@@ -423,7 +423,7 @@ const AuthForm = ({ onLogin, onNeedsVerification }) => {
                 type="button"
                 onClick={() => handleOAuthConnect("GitHub")}
                 disabled={loading}
-                className="w-full flex items-center justify-center gap-2 bg-surfaceHighlight hover:bg-surface border border-border text-textMain font-medium py-2.5 rounded-xl transition-all transform hover:scale-[1.01] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                className="w-full flex items-center justify-center gap-2 bg-surfaceHighlight hover:bg-surface border border-border text-textMain font-medium py-2.5 rounded-xl transition-all transform hover:scale-[1.01] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 cursor-pointer"
               >
                 <Github className="w-4 h-4" />
                 <span className="text-sm">GitHub</span>

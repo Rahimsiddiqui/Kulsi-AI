@@ -13,10 +13,6 @@ const getAuthHeaders = () => {
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
-  console.log("[noteService] Auth headers:", {
-    hasToken: !!token,
-    tokenLength: token?.length || 0,
-  });
   return headers;
 };
 

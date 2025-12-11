@@ -72,6 +72,22 @@ router.get("/:id", async (req, res) => {
 router.post("/", async (req, res) => {
   try {
     const { title, content, tags, color } = req.body;
+
+    // Prevent duplicate welcome notes
+    if (title === "Welcome to Kulsi AI") {
+      const existingWelcomeNote = await Note.findOne({
+        userId: req.userId,
+        title: "Welcome to Kulsi AI",
+        isTrashed: false,
+      });
+      if (existingWelcomeNote) {
+        return res.status(409).json({
+          error: "Welcome note already exists",
+          note: existingWelcomeNote,
+        });
+      }
+    }
+
     const note = new Note({
       userId: req.userId,
       title: title || "Untitled Note",

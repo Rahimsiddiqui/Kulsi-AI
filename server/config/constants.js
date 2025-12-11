@@ -37,7 +37,7 @@ Kulsi AI is a minimal, fast, and AI-powered note-taking app.
 - *Italic*: \`Cmd+I\` or \`Ctrl+I\`
 - __Underline__: \`Cmd+U\` or \`Ctrl+U\`
 - ~~Strikethrough~~: \`Cmd+Shift+X\` or \`Ctrl+Shift+X\`
-- \`Inline Code\`: \`Cmd+\` or \`Ctrl+\`
+- \`Inline Code\`: \`Cmd+backtick\` or \`Ctrl+backtick\`
 
 ### List & Structure:
 - **Bullet List**: \`Cmd+Shift+L\` or \`Ctrl+Shift+L\`

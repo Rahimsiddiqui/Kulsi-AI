@@ -27,6 +27,7 @@ import {
   Link as LinkIcon,
   PanelLeftOpen,
   Copy,
+  Save,
 } from "lucide-react";
 import { generateNoteEnhancement } from "../services/geminiService";
 import { format } from "date-fns";
@@ -68,21 +69,13 @@ const Editor = ({
   const [aiMenuOpen, setAiMenuOpen] = useState(false);
   const [showDrawingModal, setShowDrawingModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   // History stack state
   const [history, setHistory] = useState([ensureString(note.content)]);
   const [historyIndex, setHistoryIndex] = useState(0);
 
-  // Debug logging
-  useEffect(() => {
-    if (content && typeof content !== "string") {
-      console.warn("⚠️ WARNING: content is not a string!", {
-        type: typeof content,
-        value: content,
-        stringified: String(content),
-      });
-    }
-  }, [content]);
+  // Removed debug logging
 
   const aiMenuRef = useRef(null);
   const tiptapRef = useRef(null);
@@ -95,7 +88,6 @@ const Editor = ({
       isMountedRef.current = false;
     };
   }, []);
-
   // Sync when active note changes (but preserve local edits)
   useEffect(() => {
     // Only sync when note ID changes, not on every content change
@@ -104,25 +96,6 @@ const Editor = ({
     setHistory([ensureString(note.content)]);
     setHistoryIndex(0);
   }, [note?.id]);
-
-  // Debounced autosave
-  useEffect(() => {
-    if (typeof onUpdate !== "function") return;
-    if (!note?.id) return; // Don't save if note ID is missing
-
-    const handler = setTimeout(() => {
-      try {
-        if (title !== (note.title || "") || content !== (note.content || "")) {
-          onUpdate(note.id, { title, content, updatedAt: Date.now() });
-        }
-      } catch (err) {
-        // swallow errors but log in dev
-        // eslint-disable-next-line no-console
-        console.error("Autosave failed:", err);
-      }
-    }, 500);
-    return () => clearTimeout(handler);
-  }, [title, content, note.id, note.title, note.content, onUpdate]);
 
   // Close AI menu when clicking outside
   useEffect(() => {
@@ -195,13 +168,17 @@ const Editor = ({
 
   const handlePaste = useCallback(
     (e) => {
+      // Safety check - ensure event exists and has clipboardData
+      if (!e || !e.clipboardData) return;
+
       // Get pasted text from clipboard
-      const pastedText = e.clipboardData?.getData("text/plain") || "";
+      const pastedText = e.clipboardData.getData("text/plain") || "";
 
       if (!pastedText) return;
 
-      // Check if pasted content has markdown markup
-      const hasMarkdown = /(\*\*|__|\*|_|~~|`|^#|^\d+\.|^-\s|\[x?\]|>)/m.test(
+      // Check if pasted content has markdown markup (including headings)
+      // Headings: # ## ### etc followed by space
+      const hasMarkdown = /(\*\*|__|\*|_|~~|`|#+\s|\d+\.|^-\s|\[x?\]|>)/m.test(
         pastedText
       );
 
@@ -216,7 +193,11 @@ const Editor = ({
           tiptapRef.current.insertText("", "");
           // Insert the pasted content which will be parsed as markdown
           const currentContent = content || "";
-          updateContentWithHistory(currentContent + "\n" + pastedText);
+          // Add a newline before pasted content to separate from existing text
+          const newContent = currentContent
+            ? currentContent + "\n" + pastedText
+            : pastedText;
+          updateContentWithHistory(newContent);
           toast.success("Markdown pasted and converted!");
         }
       }
@@ -249,7 +230,6 @@ const Editor = ({
           });
       } catch (error) {
         toast.error("Failed to copy content");
-        console.error("Copy failed:", error);
       }
     }
   }, [content]);
@@ -295,6 +275,33 @@ const Editor = ({
     [content, note.tags, note.id, onUpdate, updateContentWithHistory]
   );
 
+  const handleSave = useCallback(() => {
+    if (!note?.id) {
+      toast.error("Cannot save: Note ID missing");
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      console.log("Saving note:", {
+        id: note.id,
+        title,
+        contentLength: content?.length || 0,
+      });
+
+      onUpdate(note.id, { title, content, updatedAt: Date.now() });
+
+      // Reset saving state immediately since onUpdate is synchronous for local state
+      setIsSaving(false);
+      toast.success("Note saved successfully!");
+    } catch (error) {
+      console.error("Save error:", error);
+      setIsSaving(false);
+      toast.error("Failed to save note");
+    }
+  }, [note.id, title, content, onUpdate]);
+
   const handleKeyDown = useCallback(
     (e) => {
       // Check if we're in an input field that shouldn't have shortcuts
@@ -305,30 +312,10 @@ const Editor = ({
       const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
       const modKey = isMac ? e.metaKey : e.ctrlKey;
 
-      // Bold: Ctrl/Cmd + B
-      if (modKey && e.key === "b") {
+      // Copy with Markup: Ctrl/Cmd + C (plain copy)
+      if (modKey && e.key.toLowerCase() === "c" && !e.altKey && !e.shiftKey) {
         e.preventDefault();
-        tiptapRef.current?.insertText("**", "**");
-      }
-      // Italic: Ctrl/Cmd + I
-      else if (modKey && e.key === "i") {
-        e.preventDefault();
-        tiptapRef.current?.insertText("*", "*");
-      }
-      // Underline: Ctrl/Cmd + U
-      else if (modKey && e.key === "u") {
-        e.preventDefault();
-        tiptapRef.current?.insertText("__", "__");
-      }
-      // Strikethrough: Ctrl/Cmd + Shift + X
-      else if (modKey && e.shiftKey && e.key === "X") {
-        e.preventDefault();
-        tiptapRef.current?.insertText("~~", "~~");
-      }
-      // Inline Code: Ctrl/Cmd + `
-      else if (modKey && e.key === "`") {
-        e.preventDefault();
-        tiptapRef.current?.insertText("`", "`");
+        handleCopy();
       }
       // Heading 2: Ctrl/Cmd + Alt + 1
       else if (modKey && e.altKey && e.key === "1") {
@@ -355,53 +342,18 @@ const Editor = ({
         e.preventDefault();
         tiptapRef.current?.setHeading(6);
       }
-      // Block Ctrl/Cmd + Alt + 6 (not supported)
-      else if (modKey && e.altKey && e.key === "6") {
-        e.preventDefault();
-        return;
-      }
-      // Blockquote: Ctrl/Cmd + Shift + .
-      else if (modKey && e.shiftKey && e.key === ">") {
-        e.preventDefault();
-        tiptapRef.current?.insertBlock("> ");
-      }
-      // Checkbox: Ctrl/Cmd + Shift + C
-      else if (modKey && e.shiftKey && e.key === "C") {
-        e.preventDefault();
-        tiptapRef.current?.toggleTaskList();
-      }
-      // Copy with Markup: Ctrl/Cmd + C (standard copy, but copy markdown with markup)
-      else if (modKey && e.key === "c" && !e.shiftKey && !e.altKey) {
-        e.preventDefault();
-        handleCopy();
-      }
       // Copy with Markup: Ctrl/Cmd + Alt + C (alternative shortcut)
-      else if (modKey && e.altKey && e.key === "c") {
+      else if (modKey && e.altKey && e.key.toLowerCase() === "c") {
         e.preventDefault();
         handleCopy();
-      }
-      // Bullet List: Ctrl/Cmd + Shift + L
-      else if (modKey && e.shiftKey && e.key === "L") {
-        e.preventDefault();
-        tiptapRef.current?.toggleBulletList();
       }
       // Drawing: Ctrl/Cmd + Shift + D
-      else if (modKey && e.shiftKey && e.key === "D") {
+      else if (modKey && e.shiftKey && e.key.toLowerCase() === "d") {
         e.preventDefault();
         setShowDrawingModal(true);
       }
-      // Undo: Ctrl/Cmd + Z (TipTap handles this natively, but ensure it works)
-      else if (modKey && e.key === "z" && !e.shiftKey) {
-        e.preventDefault();
-        undo();
-      }
-      // Redo: Ctrl/Cmd + Shift + Z
-      else if (modKey && e.shiftKey && e.key === "Z") {
-        e.preventDefault();
-        redo();
-      }
     },
-    [undo, redo, handleCopy]
+    [handleCopy]
   );
 
   // Global keyboard shortcuts listener
@@ -1419,6 +1371,21 @@ const Editor = ({
 
         <div className="flex items-center gap-1 md:gap-2">
           <div className="h-6 w-px bg-gray-200 hidden md:block" />
+
+          {note?.id && (
+            <ActionBtn
+              onClick={handleSave}
+              icon={Save}
+              disabled={isSaving || !title.trim()}
+              tooltip="Save note"
+              ariaLabel="Save note"
+              className={`p-2 rounded-full transition-colors ${
+                isSaving
+                  ? "text-gray-400 opacity-50"
+                  : "text-gray-400 hover:text-indigo-600 hover:bg-indigo-50"
+              }`}
+            />
+          )}
 
           <div className="flex items-center space-x-1">
             <ActionBtn

@@ -14,6 +14,11 @@ const generateId = () => {
   return `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 };
 
+// Helper to identify welcome note by title (since ID changes when saved to MongoDB)
+const isWelcomeNote = (note) => {
+  return note?.title === "Welcome to Kulsi AI";
+};
+
 const INITIAL_NOTES = [
   {
     id: INITIAL_NOTE_ID,
@@ -46,9 +51,7 @@ export const useNotes = () => {
           // No token, use localStorage
           const saved = localStorage.getItem("kulsi-notes");
           const localNotes = saved ? JSON.parse(saved) : INITIAL_NOTES;
-          const hasWelcomeNote = localNotes.some(
-            (note) => note.id === INITIAL_NOTE_ID
-          );
+          const hasWelcomeNote = localNotes.some(isWelcomeNote);
           if (!hasWelcomeNote) {
             localNotes.unshift(INITIAL_NOTES[0]);
           }
@@ -60,26 +63,70 @@ export const useNotes = () => {
         // Try to fetch from MongoDB
         const mongoNotes = await noteService.getNotes();
 
+        // Transform MongoDB notes to include both id and mongoId
+        const transformedNotes =
+          mongoNotes && mongoNotes.length > 0
+            ? mongoNotes.map((note) => ({
+                ...note,
+                id: note._id, // Map MongoDB _id to id field
+                mongoId: note._id, // Keep mongoId for backend sync
+              }))
+            : [];
+
         // If MongoDB returns empty array (first login), use welcome note
-        const notesToUse =
-          mongoNotes && mongoNotes.length > 0 ? mongoNotes : INITIAL_NOTES;
+        let notesToUse =
+          transformedNotes.length > 0 ? transformedNotes : INITIAL_NOTES;
+
+        // If first login (no notes in MongoDB), check if welcome note exists before saving
+        if ((!mongoNotes || mongoNotes.length === 0) && notesToUse.length > 0) {
+          try {
+            // Check if welcome note already exists in MongoDB
+            const allMongoNotes = await noteService.getNotes();
+            const welcomeNoteExists = allMongoNotes.some(isWelcomeNote);
+
+            if (!welcomeNoteExists) {
+              // Create welcome note in MongoDB with correct format
+              const welcomeNote = notesToUse[0];
+              const mongoNote = {
+                title: welcomeNote.title,
+                content: welcomeNote.content,
+                isPinned: welcomeNote.isPinned,
+                isArchived: welcomeNote.isArchived,
+                tags: welcomeNote.tags,
+              };
+              const created = await noteService.createNote(mongoNote);
+              // Update local note with MongoDB ID
+              notesToUse = notesToUse.map((n) =>
+                n.id === welcomeNote.id ? { ...n, mongoId: created._id } : n
+              );
+            }
+          } catch (err) {
+            // If creating welcome note fails, just continue with local version
+          }
+        }
+
+        // Ensure no duplicate welcome notes - deduplicate by title
+        const seenTitles = new Set();
+        notesToUse = notesToUse.filter((note) => {
+          if (note.title === "Welcome to Kulsi AI") {
+            if (seenTitles.has("Welcome to Kulsi AI")) {
+              return false; // Skip duplicate
+            }
+            seenTitles.add("Welcome to Kulsi AI");
+          }
+          return true;
+        });
 
         // Update both localStorage and state with notes
         localStorage.setItem("kulsi-notes", JSON.stringify(notesToUse));
         setNotes(notesToUse);
       } catch (error) {
         // Fallback to localStorage if API fails
-        console.warn(
-          "Failed to fetch from MongoDB, using localStorage:",
-          error
-        );
         const saved = localStorage.getItem("kulsi-notes");
         const localNotes = saved ? JSON.parse(saved) : INITIAL_NOTES;
 
         // Ensure welcome note exists
-        const hasWelcomeNote = localNotes.some(
-          (note) => note.id === INITIAL_NOTE_ID
-        );
+        const hasWelcomeNote = localNotes.some(isWelcomeNote);
         if (!hasWelcomeNote) {
           localNotes.push(INITIAL_NOTES[0]);
         }

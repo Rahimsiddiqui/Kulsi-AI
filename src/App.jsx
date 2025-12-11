@@ -246,7 +246,7 @@ const AppContent = () => {
               width: isDesktop ? (sidebarOpen ? 256 : 72) : 288, // 72px for mini sidebar
               opacity: 1,
             }}
-            transition={{ duration: 0.4, ease: "easeInOut" }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
             style={{
               position: isDesktop ? "relative" : "fixed",
               left: 0,

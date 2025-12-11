@@ -10,6 +10,7 @@ import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
+import Strike from "@tiptap/extension-strike";
 
 const TipTapEditor = forwardRef(
   (
@@ -251,6 +252,7 @@ const TipTapEditor = forwardRef(
     const editor = useEditor({
       extensions: [
         StarterKit.configure({
+          strike: false,
           paragraph: {
             HTMLAttributes: {
               class: "leading-8 text-gray-800",
@@ -319,6 +321,11 @@ const TipTapEditor = forwardRef(
               class:
                 "bg-gray-100 text-pink-600 rounded px-1.5 py-0.5 font-mono text-sm border border-gray-200",
             },
+          },
+        }),
+        Strike.configure({
+          HTMLAttributes: {
+            class: "line-through",
           },
         }),
         TaskList.configure({
