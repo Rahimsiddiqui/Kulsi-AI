@@ -53,9 +53,8 @@ export const AuthProvider = ({ children }) => {
   const signup = async (email, password, fullName) => {
     try {
       const response = await authService.signup(email, password, fullName);
-      setUser(response.user);
-      setIsAuthenticated(true);
-      toast.success("Registration successful!");
+      // Signup doesn't authenticate - user needs to verify email first
+      toast.success("Registration successful! Check your email to verify.");
       return response;
     } catch (err) {
       toast.error(err.message || "Registration failed");

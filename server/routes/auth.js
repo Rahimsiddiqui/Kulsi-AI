@@ -75,9 +75,9 @@ router.post("/signup", async (req, res) => {
       });
     }
 
-    // Check if user already exists
+    // Check if user already exists and is verified
     const existingUser = await User.findOne({ email: email.toLowerCase() });
-    if (existingUser) {
+    if (existingUser && existingUser.isEmailVerified) {
       return res.status(400).json({ message: "User already exists." });
     }
 
@@ -88,15 +88,26 @@ router.post("/signup", async (req, res) => {
     const verificationCode = generateVerificationCode();
     const codeExpires = Date.now() + 30 * 60 * 1000; // 30 minutes
 
-    // Create user
-    const user = await User.create({
-      email: email.toLowerCase(),
-      password: hashedPassword,
-      fullName: userFullName,
-      isEmailVerified: false,
-      emailVerificationCode: verificationCode,
-      emailVerificationCodeExpiresAt: codeExpires,
-    });
+    let user;
+
+    if (existingUser && !existingUser.isEmailVerified) {
+      // User exists but not verified - update their info and resend code
+      existingUser.password = hashedPassword;
+      existingUser.fullName = userFullName;
+      existingUser.emailVerificationCode = verificationCode;
+      existingUser.emailVerificationCodeExpiresAt = codeExpires;
+      user = await existingUser.save();
+    } else {
+      // Create new user
+      user = await User.create({
+        email: email.toLowerCase(),
+        password: hashedPassword,
+        fullName: userFullName,
+        isEmailVerified: false,
+        emailVerificationCode: verificationCode,
+        emailVerificationCodeExpiresAt: codeExpires,
+      });
+    }
 
     // Send verification email
     await sendVerificationEmail(email, verificationCode);

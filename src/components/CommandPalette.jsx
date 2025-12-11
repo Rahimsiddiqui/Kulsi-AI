@@ -36,9 +36,16 @@ const CommandPalette = ({
     {
       type: "action",
       id: "new-note",
-      label: "Create New Note",
+      label: query.trim() ? `Create note "${query}"` : "Create New Note",
       icon: Plus,
-      action: onCreateNote,
+      action: () => {
+        // If user typed something, use it as the title
+        if (query.trim()) {
+          onCreateNote(query.trim());
+        } else {
+          onCreateNote();
+        }
+      },
     },
     ...notes
       .filter((n) => {

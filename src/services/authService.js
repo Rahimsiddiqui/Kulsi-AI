@@ -53,15 +53,13 @@ export const authService = {
       throw new Error(data.message || "Sign up failed");
     }
 
-    // Store token and user in localStorage
-    if (data.token) {
-      localStorage.setItem("token", data.token);
-    }
-    if (data.user) {
-      localStorage.setItem("user", JSON.stringify(data.user));
-    }
-
-    return data;
+    // Backend signup doesn't return token - requires email verification first
+    // Return the response with email for verification flow
+    return {
+      ...data,
+      needsVerification: true,
+      email: email,
+    };
   },
 
   // Login with email and password
@@ -108,7 +106,7 @@ export const authService = {
       throw new Error("Please enter a valid email address");
     }
 
-    const response = await fetchWithTimeout(`${API_URL}/verify-code`, {
+    const response = await fetchWithTimeout(`${API_URL}/verify-email`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

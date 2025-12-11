@@ -37,7 +37,7 @@ const GoogleIcon = () => (
   </svg>
 );
 
-const AuthForm = ({ onLogin }) => {
+const AuthForm = ({ onLogin, onNeedsVerification }) => {
   const { signup, login } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [formData, setFormData] = useState({
@@ -84,12 +84,18 @@ const AuthForm = ({ onLogin }) => {
         // Context will handle state update and navigation
       } else {
         // Use the signup method from useAuth context
-        await signup(formData.email, formData.password, formData.name);
-        toast.success(
-          "Registration successful! Please check your email to verify."
+        const response = await signup(
+          formData.email,
+          formData.password,
+          formData.name
         );
+        // Check if signup requires email verification
+        if (response.needsVerification) {
+          if (onNeedsVerification) {
+            onNeedsVerification(formData.email);
+          }
+        }
         setFormData({ name: "", email: "", password: "" });
-        setIsLogin(true);
       }
     } catch (err) {
       setError(err.message);

@@ -16,7 +16,7 @@ import CommandPalette from "./components/CommandPalette.jsx";
 import SubscriptionModal from "./components/SubscriptionModal.jsx";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import AuthForm from "./components/AuthForm.jsx";
-import VerifyCode from "./components/VerifyCode.jsx";
+import VerifyEmail from "./components/VerifyEmail.jsx";
 import { useNotes } from "./hooks/useNotes.js";
 import { useAuth } from "./hooks/useAuth.jsx";
 import { toast } from "react-toastify";
@@ -29,7 +29,15 @@ import { AnimatePresence, motion } from "framer-motion";
 const GraphView = React.lazy(() => import("./components/GraphView.jsx"));
 
 const AppContent = () => {
-  const { notes, addNote, updateNote, deleteNote } = useNotes();
+  const {
+    notes,
+    addNote,
+    updateNote,
+    deleteNote,
+    isLoading,
+    syncError,
+    setSyncError,
+  } = useNotes();
   const [activeFolderId, setActiveFolderId] = useState(FolderType.ALL);
   const [selectedNoteId, setSelectedNoteId] = useState(null);
 
@@ -68,6 +76,14 @@ const AppContent = () => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  // Show sync errors as toasts
+  useEffect(() => {
+    if (syncError) {
+      toast.error(syncError);
+      setSyncError(null);
+    }
+  }, [syncError, setSyncError]);
+
   const filteredNotes = useMemo(() => {
     return notes.filter((note) => {
       if (activeFolderId === FolderType.ALL)
@@ -84,17 +100,20 @@ const AppContent = () => {
     INITIAL_FOLDERS.find((f) => f.id === activeFolderId) || INITIAL_FOLDERS[0];
   const selectedNote = notes.find((n) => n.id === selectedNoteId);
 
-  const handleCreateNote = useCallback(() => {
-    // Check Plan Limits
-    if (userPlan === "free" && notes.length >= 50) {
-      setIsSubscriptionOpen(true);
-      return;
-    }
-    const newId = addNote(activeFolderId);
-    setSelectedNoteId(newId);
-    setCurrentView("notes");
-    if (window.innerWidth < 768) setSidebarOpen(false);
-  }, [addNote, activeFolderId, userPlan, notes.length]);
+  const handleCreateNote = useCallback(
+    (title) => {
+      // Check Plan Limits
+      if (userPlan === "free" && notes.length >= 50) {
+        setIsSubscriptionOpen(true);
+        return;
+      }
+      const newId = addNote(activeFolderId, title);
+      setSelectedNoteId(newId);
+      setCurrentView("notes");
+      if (window.innerWidth < 768) setSidebarOpen(false);
+    },
+    [addNote, activeFolderId, userPlan, notes.length]
+  );
 
   const generateFlashcardsForView = async () => {
     if (!filteredNotes || filteredNotes.length === 0) {
@@ -176,6 +195,16 @@ const AppContent = () => {
       />
       <ErrorBoundary>
         <div className="flex h-screen w-screen bg-white text-gray-900 overflow-hidden font-sans">
+          {/* Loading overlay */}
+          {isLoading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-50 backdrop-blur-sm">
+              <div className="flex flex-col items-center gap-4">
+                <CircularProgress size={40} />
+                <p className="text-sm text-gray-600">Loading your notes...</p>
+              </div>
+            </div>
+          )}
+
           <CommandPalette
             isOpen={isCommandPaletteOpen}
             onClose={() => setIsCommandPaletteOpen(false)}
@@ -594,7 +623,7 @@ const App = () => {
   if (!isAuthenticated) {
     if (authView === "verify") {
       return (
-        <VerifyCode
+        <VerifyEmail
           email={pendingEmail}
           onSubmit={async (data) => {
             await verifyCode(data.email, data.code);
@@ -612,6 +641,10 @@ const App = () => {
       <AuthForm
         onLogin={(userData) => {
           // User is now authenticated, AppContent will render
+        }}
+        onNeedsVerification={(email) => {
+          setPendingEmail(email);
+          setAuthView("verify");
         }}
       />
     );

@@ -15,6 +15,7 @@ import mongoose from "mongoose";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import authRoutes from "./routes/auth.js";
+import notesRoutes from "./routes/notes.js";
 
 // 3. Middleware & Helpers
 
@@ -39,6 +40,10 @@ app.use(cookieParser());
 // Auth Routes
 console.log("[DEBUG] Registering /api/auth routes");
 app.use("/api/auth", authRoutes);
+
+// Notes Routes
+console.log("[DEBUG] Registering /api/notes routes");
+app.use("/api/notes", notesRoutes);
 
 if (isProduction) {
   console.log = () => {};

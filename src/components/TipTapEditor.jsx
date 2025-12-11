@@ -4,6 +4,7 @@ import React, {
   useEffect,
   useState,
   useRef,
+  useCallback,
 } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -132,13 +133,11 @@ const TipTapEditor = forwardRef(
         }
       };
 
-      return walk(div)
-        .trim()
-        .replace(/\n{3,}/g, "\n\n");
+      return walk(div).replace(/\n{3,}/g, "\n\n");
     };
 
     // Convert Markdown to HTML - proper handling of all elements
-    const markdownToHtml = (markdown) => {
+    const markdownToHtml = useCallback((markdown) => {
       if (!markdown) return "<p></p>";
 
       let html = markdown;
@@ -247,7 +246,7 @@ const TipTapEditor = forwardRef(
       html = html.replace(/<ul>\s*<\/ul>/g, "");
 
       return html;
-    };
+    }, []);
 
     const editor = useEditor({
       extensions: [
@@ -260,37 +259,37 @@ const TipTapEditor = forwardRef(
           heading: {
             levels: [1, 2, 3, 4, 5, 6],
             HTMLAttributes: {
-              class: "font-bold text-gray-900 mt-8 mb-7",
+              class: "font-bold text-gray-900 mt-12 mb-7",
             },
           },
           h1: {
             HTMLAttributes: {
-              class: "text-5xl font-bold text-gray-900 mt-8 mb-7",
+              class: "text-5xl font-bold text-gray-900 mt-12 mb-7",
             },
           },
           h2: {
             HTMLAttributes: {
-              class: "text-4.5xl font-bold text-gray-900 mt-8 mb-7",
+              class: "text-4.5xl font-bold text-gray-900 mt-12 mb-7",
             },
           },
           h3: {
             HTMLAttributes: {
-              class: "text-4xl font-bold text-gray-900 mt-8 mb-7",
+              class: "text-4xl font-bold text-gray-900 mt-12 mb-7",
             },
           },
           h4: {
             HTMLAttributes: {
-              class: "text-3.5xl font-bold text-gray-900 mt-8 mb-7",
+              class: "text-3.5xl font-bold text-gray-900 mt-12 mb-7",
             },
           },
           h5: {
             HTMLAttributes: {
-              class: "text-3xl font-bold text-gray-900 mt-8 mb-7",
+              class: "text-3xl font-bold text-gray-900 mt-12 mb-7",
             },
           },
           h6: {
             HTMLAttributes: {
-              class: "text-2.5xl font-bold text-gray-900 mt-8 mb-7",
+              class: "text-2.5xl font-bold text-gray-900 mt-12 mb-7",
             },
           },
           bulletList: {
