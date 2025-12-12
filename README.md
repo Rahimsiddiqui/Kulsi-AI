@@ -57,7 +57,7 @@ Kulsi AI is a full-featured note-taking application with an AI writing assistant
 
 ```bash
 git clone <repository-url>
-cd kulsi-ai
+cd Kulsi-AI
 ```
 
 2. **Install dependencies**
