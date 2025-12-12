@@ -62,7 +62,9 @@ cd Kulsi-AI
 
 2. **Install dependencies**
 
-`npm install`
+```bash
+npm install
+```
 
 3. **Configure ENV Variables**
 
