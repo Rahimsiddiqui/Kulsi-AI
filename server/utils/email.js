@@ -44,10 +44,8 @@ export const sendVerificationEmail = async (email, code) => {
     };
 
     const info = await transporter.sendMail(mailOptions);
-    console.log(`✅ Verification email sent to ${email}:`, info.response);
     return info;
   } catch (error) {
-    console.error(`❌ Error sending verification email to ${email}:`, error);
     throw new Error(`Failed to send verification email: ${error.message}`);
   }
 };
@@ -94,10 +92,8 @@ export const sendResetEmail = async (email, resetToken) => {
     };
 
     const info = await transporter.sendMail(mailOptions);
-    console.log(`✅ Reset email sent to ${email}:`, info.response);
     return info;
   } catch (error) {
-    console.error(`❌ Error sending reset email to ${email}:`, error);
     throw new Error(`Failed to send reset email: ${error.message}`);
   }
 };

@@ -24,10 +24,6 @@ export const exchangeCodeForToken = async (provider, code, redirectUri) => {
     const tokenData = await tokenResponse.json();
 
     if (!tokenData.access_token) {
-      console.error(
-        "[Google OAuth] Token exchange failed:",
-        JSON.stringify(tokenData)
-      );
       throw new Error(
         `Google OAuth error: ${
           tokenData.error_description || "Token exchange failed"
@@ -61,10 +57,6 @@ export const exchangeCodeForToken = async (provider, code, redirectUri) => {
     const tokenData = await tokenResponse.json();
 
     if (!tokenData.access_token) {
-      console.error(
-        "[GitHub OAuth] Token exchange failed:",
-        JSON.stringify(tokenData)
-      );
       throw new Error(
         `GitHub OAuth error: ${
           tokenData.error_description || "Token exchange failed"

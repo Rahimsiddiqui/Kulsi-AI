@@ -144,55 +144,91 @@ export const useNotes = () => {
   // Sync notes to localStorage whenever they change
   useEffect(() => {
     if (notes.length > 0) {
-      localStorage.setItem("kulsi-notes", JSON.stringify(notes));
+      try {
+        // Filter notes to only include valid serializable data
+        const validNotes = notes.map((note) => ({
+          id: note.id,
+          title: typeof note.title === "string" ? note.title : "",
+          content: typeof note.content === "string" ? note.content : "",
+          folderId: note.folderId,
+          isPinned: Boolean(note.isPinned),
+          isArchived: Boolean(note.isArchived),
+          tags: Array.isArray(note.tags) ? note.tags : [],
+          createdAt:
+            typeof note.createdAt === "number" ? note.createdAt : Date.now(),
+          updatedAt:
+            typeof note.updatedAt === "number" ? note.updatedAt : Date.now(),
+        }));
+        localStorage.setItem("kulsi-notes", JSON.stringify(validNotes));
+      } catch (error) {
+        console.error("Failed to sync notes to localStorage:", error);
+      }
     }
   }, [notes]);
 
-  const addNote = useCallback((folderId = FolderType.PERSONAL, title = "") => {
-    const newNote = {
-      id: generateId(),
-      title: title || "",
-      content: "",
-      folderId:
-        folderId === FolderType.TRASH || folderId === FolderType.FAVORITES
-          ? FolderType.PERSONAL
-          : folderId,
-      isPinned: false,
-      isArchived: false,
-      tags: [],
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    };
+  const addNote = useCallback(
+    (folderId = FolderType.PERSONAL, title = "") => {
+      const tempId = generateId();
+      // Ensure title is always a string
+      const normalizedTitle = typeof title === "string" ? title : "";
+      const newNote = {
+        id: tempId,
+        title: normalizedTitle,
+        content: "",
+        folderId:
+          folderId === FolderType.TRASH || folderId === FolderType.FAVORITES
+            ? FolderType.PERSONAL
+            : folderId,
+        isPinned: false,
+        isArchived: false,
+        tags: [],
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
 
-    setNotes((prev) => [newNote, ...prev]);
+      setNotes((prev) => [newNote, ...prev]);
 
-    // Async: Sync to MongoDB in background
-    (async () => {
-      try {
-        // Convert to MongoDB format - MongoDB only stores title and content
-        const mongoNote = {
-          title: newNote.title || "Untitled Note",
-          content: newNote.content,
-          isPinned: newNote.isPinned,
-          isArchived: newNote.isArchived,
-          tags: newNote.tags,
-        };
-        const created = await noteService.createNote(mongoNote);
+      // Return a promise that resolves with the MongoDB ID
+      return new Promise((resolve, reject) => {
+        // Async: Sync to MongoDB in background
+        (async () => {
+          try {
+            // Convert to MongoDB format - MongoDB only stores title and content
+            const mongoNote = {
+              title:
+                typeof newNote.title === "string"
+                  ? newNote.title
+                  : "Untitled Note",
+              content:
+                typeof newNote.content === "string" ? newNote.content : "",
+              isPinned: Boolean(newNote.isPinned),
+              isArchived: Boolean(newNote.isArchived),
+              tags: Array.isArray(newNote.tags) ? newNote.tags : [],
+            };
+            const created = await noteService.createNote(mongoNote);
 
-        // Update local note with MongoDB _id so future syncs use correct ID
-        setNotes((prev) =>
-          prev.map((n) =>
-            n.id === newNote.id ? { ...n, mongoId: created._id } : n
-          )
-        );
-      } catch (error) {
-        console.error("Failed to sync new note to MongoDB:", error);
-        setSyncError("Failed to save note to server");
-      }
-    })();
+            // Create updated note object with MongoDB ID
+            const updatedNote = {
+              ...newNote,
+              id: created._id,
+              _id: created._id,
+              mongoId: created._id,
+            };
 
-    return newNote.id;
-  }, []);
+            // Update local state with the note using MongoDB ID
+            setNotes((prev) =>
+              prev.map((n) => (n.id === tempId ? updatedNote : n))
+            );
+            resolve(created._id);
+          } catch (error) {
+            setSyncError("Failed to save note to server");
+            reject(error);
+          }
+        })();
+      });
+    },
+    [setSyncError]
+  );
 
   const updateNote = useCallback(
     (id, updates) => {
@@ -220,7 +256,6 @@ export const useNotes = () => {
             await noteService.updateNote(note.mongoId, mongoUpdates);
           }
         } catch (error) {
-          console.error("Failed to sync note update to MongoDB:", error);
           setSyncError("Failed to save changes to server");
         }
       })();
@@ -242,10 +277,7 @@ export const useNotes = () => {
             await noteService.deleteNote(note.mongoId);
           }
         } catch (error) {
-          console.error("Failed to sync note deletion to MongoDB:", error);
           setSyncError("Failed to delete note on server");
-          // Optionally, restore the note locally if MongoDB deletion fails
-          // For now, just log the error
         }
       })();
     },
@@ -272,7 +304,6 @@ export const useNotes = () => {
             });
           }
         } catch (error) {
-          console.error("Failed to sync note restoration to MongoDB:", error);
           setSyncError("Failed to restore note on server");
         }
       })();

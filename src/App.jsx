@@ -4,8 +4,9 @@ import React, {
   useEffect,
   useCallback,
   Suspense,
+  useRef,
 } from "react";
-import { Menu, Sparkles } from "lucide-react";
+import { Menu, Sparkles, PanelLeftOpen, PanelLeftClose } from "lucide-react";
 import CircularProgress from "@mui/material/CircularProgress";
 import { ToastContainer, Zoom } from "react-toastify";
 
@@ -17,6 +18,7 @@ import SubscriptionModal from "./components/SubscriptionModal.jsx";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import AuthForm from "./components/AuthForm.jsx";
 import VerifyEmail from "./components/VerifyEmail.jsx";
+import ContextMenu from "./components/ContextMenu.jsx";
 import { useNotes } from "./hooks/useNotes.js";
 import { useAuth } from "./hooks/useAuth.jsx";
 import { toast } from "react-toastify";
@@ -55,6 +57,142 @@ const AppContent = () => {
   const [flashcardIndex, setFlashcardIndex] = useState(0);
   const [showBack, setShowBack] = useState(false);
 
+  // Context Menu State
+  const [contextMenu, setContextMenu] = useState({
+    isVisible: false,
+    x: 0,
+    y: 0,
+  });
+  const appRef = useRef(null);
+
+  // Calculate selectedNote early so handlers can use it
+  const selectedNote = notes.find((n) => n.id === selectedNoteId);
+
+  // Context Menu Handlers
+  const handleContextMenu = useCallback((e) => {
+    e.preventDefault();
+    setContextMenu({
+      isVisible: true,
+      x: e.clientX,
+      y: e.clientY,
+    });
+  }, []);
+
+  const closeContextMenu = useCallback(() => {
+    setContextMenu({ isVisible: false, x: 0, y: 0 });
+  }, []);
+
+  const handleAddNoteFromContext = useCallback(() => {
+    closeContextMenu();
+    handleCreateNote();
+  }, [closeContextMenu]);
+
+  const handleCopySelection = useCallback(() => {
+    const selectedText = window.getSelection().toString();
+    if (selectedText) {
+      navigator.clipboard.writeText(selectedText);
+      toast.success("Copied to clipboard!");
+    } else {
+      toast.info("No text selected");
+    }
+    closeContextMenu();
+  }, []);
+
+  const handleCreateLink = useCallback(() => {
+    const selectedText = window.getSelection().toString();
+    if (selectedText) {
+      toast.info("Link creation feature coming soon!");
+    } else {
+      toast.info("Please select text to create a link");
+    }
+    closeContextMenu();
+  }, []);
+
+  const handleGenerateIdeas = useCallback(() => {
+    if (selectedNote) {
+      toast.info("Generating ideas from your note...");
+      // TODO: Implement AI idea generation
+    } else {
+      toast.info("Please select a note first");
+    }
+    closeContextMenu();
+  }, [selectedNote]);
+
+  const handleShareNote = useCallback(() => {
+    if (selectedNote) {
+      // Copy note link to clipboard or open share dialog
+      navigator.clipboard.writeText(`Note: ${selectedNote.title}`);
+      toast.success("Share link copied!");
+    } else {
+      toast.info("Please select a note to share");
+    }
+    closeContextMenu();
+  }, [selectedNote]);
+
+  const handleDownloadNote = useCallback(() => {
+    if (selectedNote) {
+      const element = document.createElement("a");
+      const file = new Blob([selectedNote.content || selectedNote.title], {
+        type: "text/plain",
+      });
+      element.href = URL.createObjectURL(file);
+      element.download = `${selectedNote.title}.txt`;
+      document.body.appendChild(element);
+      element.click();
+      document.body.removeChild(element);
+      toast.success("Note downloaded!");
+    } else {
+      toast.info("Please select a note to download");
+    }
+    closeContextMenu();
+  }, [selectedNote]);
+
+  const handlePinNote = useCallback(() => {
+    if (selectedNote) {
+      updateNote(selectedNote.id, { isPinned: !selectedNote.isPinned });
+      toast.success(selectedNote.isPinned ? "Note unpinned" : "Note pinned!");
+    } else {
+      toast.info("Please select a note to pin");
+    }
+    closeContextMenu();
+  }, [selectedNote, updateNote]);
+
+  const handleArchiveNote = useCallback(() => {
+    if (selectedNote) {
+      toast.info("Archive feature coming soon!");
+    } else {
+      toast.info("Please select a note to archive");
+    }
+    closeContextMenu();
+  }, [selectedNote]);
+
+  const handleDeleteNote = useCallback(() => {
+    if (selectedNote) {
+      if (window.confirm(`Delete "${selectedNote.title}"?`)) {
+        deleteNote(selectedNote.id);
+        setSelectedNoteId(null);
+        toast.success("Note deleted!");
+      }
+    } else {
+      toast.info("Please select a note to delete");
+    }
+    closeContextMenu();
+  }, [selectedNote, deleteNote]);
+
+  const handleSearchFromContext = useCallback(() => {
+    setIsCommandPaletteOpen(true);
+    closeContextMenu();
+  }, []);
+
+  const handleEmailNote = useCallback(() => {
+    if (selectedNote) {
+      toast.info("Email feature coming soon!");
+    } else {
+      toast.info("Please select a note to email");
+    }
+    closeContextMenu();
+  }, [selectedNote]);
+
   // Responsive Sidebar Logic
   useEffect(() => {
     const handleResize = () => {
@@ -84,6 +222,28 @@ const AppContent = () => {
     }
   }, [syncError, setSyncError]);
 
+  // Disable default context menu and setup custom context menu
+  useEffect(() => {
+    const appElement = appRef.current;
+    if (!appElement) return;
+
+    const handleContextMenuEvent = (e) => {
+      handleContextMenu(e);
+    };
+
+    const handleClickOutside = () => {
+      closeContextMenu();
+    };
+
+    appElement.addEventListener("contextmenu", handleContextMenuEvent);
+    document.addEventListener("click", handleClickOutside);
+
+    return () => {
+      appElement.removeEventListener("contextmenu", handleContextMenuEvent);
+      document.removeEventListener("click", handleClickOutside);
+    };
+  }, [handleContextMenu, closeContextMenu]);
+
   const filteredNotes = useMemo(() => {
     return notes.filter((note) => {
       if (activeFolderId === FolderType.ALL)
@@ -98,19 +258,25 @@ const AppContent = () => {
 
   const activeFolder =
     INITIAL_FOLDERS.find((f) => f.id === activeFolderId) || INITIAL_FOLDERS[0];
-  const selectedNote = notes.find((n) => n.id === selectedNoteId);
 
   const handleCreateNote = useCallback(
-    (title) => {
+    async (title) => {
       // Check Plan Limits
       if (userPlan === "free" && notes.length >= 50) {
         setIsSubscriptionOpen(true);
         return;
       }
-      const newId = addNote(activeFolderId, title);
-      setSelectedNoteId(newId);
-      setCurrentView("notes");
-      if (window.innerWidth < 768) setSidebarOpen(false);
+      // Use default title if none provided
+      const noteTitle = title || "Untitled Note";
+      try {
+        const newId = await addNote(activeFolderId, noteTitle);
+        setSelectedNoteId(newId);
+        setCurrentView("notes");
+        toast.success("Note created!");
+        if (window.innerWidth < 768) setSidebarOpen(false);
+      } catch (error) {
+        toast.error("Failed to create note");
+      }
     },
     [addNote, activeFolderId, userPlan, notes.length]
   );
@@ -139,7 +305,6 @@ const AppContent = () => {
         toast.success(`Generated ${cards.length} flashcards`);
       }
     } catch (error) {
-      console.error("Flashcard generation error:", error);
       toast.error(error.message || "Failed to generate flashcards");
     } finally {
       setIsGeneratingFlashcards(false);
@@ -172,6 +337,23 @@ const AppContent = () => {
 
   return (
     <>
+      <ContextMenu
+        isVisible={contextMenu.isVisible}
+        position={{ x: contextMenu.x, y: contextMenu.y }}
+        onAddNote={handleAddNoteFromContext}
+        onCopySelection={handleCopySelection}
+        onCreateLink={handleCreateLink}
+        onGenerateIdeas={handleGenerateIdeas}
+        onShareNote={handleShareNote}
+        onDownloadNote={handleDownloadNote}
+        onPinNote={handlePinNote}
+        onArchiveNote={handleArchiveNote}
+        onDeleteNote={handleDeleteNote}
+        onSearch={handleSearchFromContext}
+        onEmailNote={handleEmailNote}
+        selectedNote={selectedNote}
+      />
+
       <ToastContainer
         position="top-center"
         autoClose={2000}
@@ -194,7 +376,10 @@ const AppContent = () => {
         }}
       />
       <ErrorBoundary>
-        <div className="flex h-screen w-screen bg-white text-gray-900 overflow-hidden font-sans">
+        <div
+          ref={appRef}
+          className="flex h-screen w-screen bg-white text-gray-900 overflow-hidden font-sans"
+        >
           {/* Loading overlay */}
           {isLoading && (
             <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-50 backdrop-blur-sm">
@@ -285,7 +470,7 @@ const AppContent = () => {
               <div className="h-14 border-b border-gray-100 flex items-center justify-between px-4 bg-white/80 backdrop-blur z-30 shrink-0">
                 <button
                   onClick={() => setSidebarOpen(true)}
-                  className="cursor-pointer p-2 -ml-2 text-gray-600"
+                  className="point p-2 -ml-2 text-gray-600"
                 >
                   <Menu className="w-6 h-6" />
                 </button>
@@ -310,6 +495,7 @@ const AppContent = () => {
                     selectedNoteId={selectedNoteId}
                     onSelectNote={(id) => {
                       setSelectedNoteId(id);
+                      setCurrentView("notes");
                     }}
                     folderName={activeFolder.name}
                     onToggle={() => setIsNoteListOpen(false)}
@@ -320,11 +506,7 @@ const AppContent = () => {
 
             {/* Editor / Viewport */}
             <div
-              className={`flex-1 h-full bg-white relative overflow-hidden ${
-                !selectedNoteId && currentView === "notes" && !isDesktop
-                  ? "hidden"
-                  : "block"
-              }`}
+              className={`flex-1 h-full bg-white relative overflow-hidden block`}
             >
               {currentView === "notes" ? (
                 selectedNote ? (
@@ -338,6 +520,7 @@ const AppContent = () => {
                         setSelectedNoteId(null);
                       }}
                       onSelectNote={setSelectedNoteId}
+                      onCreateNote={handleCreateNote}
                       isSidebarOpen={sidebarOpen}
                       isNoteListOpen={isNoteListOpen}
                       onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
@@ -353,10 +536,10 @@ const AppContent = () => {
                       {!isNoteListOpen && (
                         <button
                           onClick={() => setIsNoteListOpen(true)}
-                          className="cursor-pointer p-2 bg-white shadow rounded-lg hover:bg-gray-50 text-gray-600"
+                          className="point p-2 bg-white shadow rounded-lg hover:bg-gray-50 text-gray-600"
                           aria-label="Open note list"
                         >
-                          <Menu className="w-5 h-5 rotate-180" />
+                          <PanelLeftOpen className="w-h" />
                         </button>
                       )}
                     </div>
@@ -387,9 +570,9 @@ const AppContent = () => {
                     {!sidebarOpen && !isDesktop && (
                       <button
                         onClick={() => setSidebarOpen(true)}
-                        className="cursor-pointer p-2 bg-white shadow rounded-lg hover:bg-gray-50"
+                        className="point p-2 bg-white shadow rounded-lg hover:bg-gray-50"
                       >
-                        <Menu className="w-5 h-5 text-gray-600" />
+                        <Menu className="w-h text-gray-600" />
                       </button>
                     )}
                   </div>
@@ -415,9 +598,9 @@ const AppContent = () => {
                     {!sidebarOpen && !isDesktop && (
                       <button
                         onClick={() => setSidebarOpen(true)}
-                        className="cursor-pointer p-2 bg-white shadow rounded-lg hover:bg-gray-50"
+                        className="point p-2 bg-white shadow rounded-lg hover:bg-gray-50"
                       >
-                        <Menu className="w-5 h-5 text-gray-600" />
+                        <Menu className="w-h text-gray-600" />
                       </button>
                     )}
                   </div>
@@ -433,7 +616,7 @@ const AppContent = () => {
                       <button
                         onClick={generateFlashcardsForView}
                         disabled={isGeneratingFlashcards}
-                        className="cursor-pointer bg-indigo-600 text-white px-6 py-3 rounded-xl shadow-lg hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2 mx-auto transition-transform active:scale-95"
+                        className="point bg-indigo-600 text-white px-6 py-3 rounded-xl shadow-lg hover:bg-indigo-700 font-medium disabled:opacity-50 flex items-center gap-2 mx-auto transition-transform hover:scale-105 active:scale-95 disabled:cursor-not-allowed"
                       >
                         {isGeneratingFlashcards
                           ? "Generating..."
@@ -443,7 +626,7 @@ const AppContent = () => {
                   ) : (
                     <div className="max-w-xl w-full perspective-1000">
                       <div
-                        className={`relative w-full h-80 bg-white rounded-2xl shadow-xl cursor-pointer transition-transform duration-500 transform-style-3d ${
+                        className={`relative w-full h-80 bg-white rounded-2xl shadow-xl point transition-transform duration-500 transform-style-3d ${
                           showBack ? "rotate-y-180" : ""
                         }`}
                         onClick={() => setShowBack(!showBack)}
@@ -596,7 +779,6 @@ const App = () => {
       // Reload page to reinitialize auth with new token in localStorage
       window.location.href = "/";
     } catch (err) {
-      console.error("OAuth callback error:", err);
       localStorage.removeItem("authMode");
       localStorage.removeItem("oauthProvider");
 

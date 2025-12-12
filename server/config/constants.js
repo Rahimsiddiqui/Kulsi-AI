@@ -56,7 +56,7 @@ Kulsi AI is a minimal, fast, and AI-powered note-taking app.
 [ ] Create your first bullet list with Ctrl+Shift+L
 [ ] Add a checkbox with Ctrl+Shift+C
 [ ] Use the AI assistant to improve this text
-[ ] Link to another note with [[Note Name]]
+[ ] Link to another note with their [note name](http://localhost:5173)
 
 
 Start writing your next big idea...

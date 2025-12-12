@@ -42,7 +42,7 @@ const NavItem = ({
   <SidebarTooltip text={label} isCollapsed={isCollapsed} alwaysShow={true}>
     <button
       onClick={onClick}
-      className={`cursor-pointer w-full flex items-center ${
+      className={`point w-full flex items-center ${
         isCollapsed ? "justify-center px-0" : "justify-between px-3"
       } py-2.5 text-sm font-medium rounded-xl transition-all duration-200 group ${
         isActive
@@ -175,10 +175,10 @@ const Sidebar = ({
           >
             <button
               onClick={onToggle}
-              className="cursor-pointer p-1.5 hover:bg-gray-200/50 rounded-lg text-gray-400 hover:text-gray-600 transition-colors mb-2"
+              className="point p-1.5 hover:bg-gray-200/50 rounded-lg text-gray-400 hover:text-gray-600 transition-colors mb-2"
               aria-label="Expand sidebar"
             >
-              <ChevronsRight className="w-5 h-5" />
+              <ChevronsRight className="w-h" />
             </button>
           </SidebarTooltip>
         )}
@@ -202,10 +202,10 @@ const Sidebar = ({
           >
             <button
               onClick={onToggle}
-              className="cursor-pointer p-1.5 hover:bg-gray-200/50 rounded-lg text-gray-400 hover:text-gray-600 transition-colors"
+              className="point p-1.5 hover:bg-gray-200/50 rounded-lg text-gray-400 hover:text-gray-600 transition-colors"
               aria-label="Collapse sidebar"
             >
-              <ChevronsLeft className="w-5 h-5" />
+              <ChevronsLeft className="w-h" />
             </button>
           </SidebarTooltip>
         )}
@@ -220,12 +220,12 @@ const Sidebar = ({
           <motion.button
             whileTap={{ scale: 0.98 }}
             onClick={onCreateNote}
-            className={`cursor-pointer w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 ${
+            className={`point w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 ${
               isCollapsed ? "px-0" : "px-4"
             } rounded-xl flex items-center justify-center space-x-1 transition-all shadow-lg shadow-indigo-200 hover:shadow-indigo-300`}
             aria-label="Create new note"
           >
-            <Plus className="w-5 h-5" />
+            <Plus className="w-h" />
             {!isCollapsed && <span>New Note</span>}
           </motion.button>
         </SidebarTooltip>
@@ -276,7 +276,7 @@ const Sidebar = ({
         ))}
 
         {!isCollapsed && (
-          <div className="flex items-center justify-between px-3 mt-6 mb-2 group cursor-pointer">
+          <div className="flex items-center justify-between px-3 mt-6 mb-2 group point">
             <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
               Folders
             </div>
@@ -316,7 +316,7 @@ const Sidebar = ({
               onClick={onOpenSubscription}
               className={`bg-linear-to-r from-indigo-500 to-purple-600 rounded-xl ${
                 isCollapsed ? "p-2" : "p-3"
-              } text-white cursor-pointer shadow-md mb-3`}
+              } text-white point shadow-md mb-3`}
               role="button"
               tabIndex={0}
               aria-label="Go Pro"
@@ -346,7 +346,7 @@ const Sidebar = ({
         >
           <button
             onClick={onOpenSettings}
-            className={`cursor-pointer flex items-center ${
+            className={`point flex items-center ${
               isCollapsed ? "justify-center" : "space-x-3"
             } text-gray-600 hover:text-gray-900 text-sm font-medium w-full px-3 py-2 rounded-xl hover:bg-white hover:shadow-sm transition-all border border-transparent hover:border-gray-100`}
             aria-label="Settings"

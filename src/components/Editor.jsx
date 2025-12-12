@@ -42,6 +42,7 @@ const Editor = ({
   onUpdate = () => {},
   onDelete = () => {},
   onSelectNote = () => {},
+  onCreateNote = () => {},
   notes = [],
   isSidebarOpen,
   isNoteListOpen,
@@ -70,10 +71,15 @@ const Editor = ({
   const [showDrawingModal, setShowDrawingModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   // History stack state
   const [history, setHistory] = useState([ensureString(note.content)]);
   const [historyIndex, setHistoryIndex] = useState(0);
+
+  // Track original note values to detect changes
+  const originalTitleRef = useRef(note.title || "");
+  const originalContentRef = useRef(ensureString(note.content));
 
   // Removed debug logging
 
@@ -95,6 +101,18 @@ const Editor = ({
     setContent(ensureString(note.content));
     setHistory([ensureString(note.content)]);
     setHistoryIndex(0);
+    // Reset unsaved changes flag when switching notes
+    setHasUnsavedChanges(false);
+    // Update original references
+    originalTitleRef.current = note.title || "";
+    originalContentRef.current = ensureString(note.content);
+
+    // Fade in the editor when note changes
+    const editorElement = document.querySelector(".editor-container");
+    if (editorElement) {
+      editorElement.style.opacity = "1";
+      editorElement.style.transition = "opacity 0.3s ease-in";
+    }
   }, [note?.id]);
 
   // Close AI menu when clicking outside
@@ -107,6 +125,32 @@ const Editor = ({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // Check for unsaved changes whenever title or content changes
+  useEffect(() => {
+    const hasChanges =
+      title !== originalTitleRef.current ||
+      content !== originalContentRef.current;
+    setHasUnsavedChanges(hasChanges);
+  }, [title, content]);
+
+  // Warn user if they try to leave the page with unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (event) => {
+      if (hasUnsavedChanges) {
+        // Most modern browsers ignore the custom message and show their own
+        event.preventDefault();
+        event.returnValue =
+          "You have unsaved changes. Are you sure you want to leave?";
+        return "You have unsaved changes. Are you sure you want to leave?";
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [hasUnsavedChanges]);
 
   // Update content and maintain history in a safe, functional way
   const updateContentWithHistory = useCallback(
@@ -267,7 +311,6 @@ const Editor = ({
         // show the user a helpful message
         toast.error("Failed to generate AI content. Try again later.");
         // eslint-disable-next-line no-console
-        console.error("AI action failed:", error);
       } finally {
         if (isMountedRef.current) setIsAiLoading(false);
       }
@@ -284,19 +327,16 @@ const Editor = ({
     setIsSaving(true);
 
     try {
-      console.log("Saving note:", {
-        id: note.id,
-        title,
-        contentLength: content?.length || 0,
-      });
-
       onUpdate(note.id, { title, content, updatedAt: Date.now() });
 
       // Reset saving state immediately since onUpdate is synchronous for local state
       setIsSaving(false);
+      // Update original references to mark as saved
+      originalTitleRef.current = title;
+      originalContentRef.current = content;
+      setHasUnsavedChanges(false);
       toast.success("Note saved successfully!");
     } catch (error) {
-      console.error("Save error:", error);
       setIsSaving(false);
       toast.error("Failed to save note");
     }
@@ -312,6 +352,12 @@ const Editor = ({
       const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
       const modKey = isMac ? e.metaKey : e.ctrlKey;
 
+      // New Note: Ctrl/Cmd + N
+      if (modKey && e.key.toLowerCase() === "n" && !e.altKey && !e.shiftKey) {
+        e.preventDefault();
+        onCreateNote();
+        return;
+      }
       // Copy with Markup: Ctrl/Cmd + C (plain copy)
       // Only intercept copy if there's NO selection - let browser handle selected text
       if (modKey && e.key.toLowerCase() === "c" && !e.altKey && !e.shiftKey) {
@@ -381,7 +427,7 @@ const Editor = ({
         tiptapRef.current?.toggleTaskList();
       }
     },
-    [handleCopy]
+    [handleCopy, onCreateNote]
   );
 
   // Global keyboard shortcuts listener
@@ -511,7 +557,7 @@ const Editor = ({
                 if (targetNote) onSelectNote(targetNote.id);
                 else toast.error(`Note "${linkTarget}" not found.`);
               }}
-              className="text-indigo-600 font-medium hover:underline decoration-indigo-300 cursor-pointer bg-indigo-50 px-1 rounded hover:bg-indigo-100"
+              className="text-indigo-600 font-medium hover:underline decoration-indigo-300 point bg-indigo-50 px-1 rounded hover:bg-indigo-100"
               aria-label={`Link to note ${linkTarget}`}
               role="button"
               tabIndex={0}
@@ -661,30 +707,24 @@ const Editor = ({
         let data;
         try {
           data = canvas.toDataURL("image/png");
-          console.log("Canvas data URL length:", data.length);
         } catch (err) {
-          console.error("Canvas export error:", err);
           toast.error("Failed to export drawing. Please try again.");
           return;
         }
 
         // Check if data URL is valid
         if (!data || data.length < 100 || data === "data:,") {
-          console.warn("Invalid data URL:", data);
           toast.error("Drawing is empty. Please draw something first.");
           return;
         }
 
         // Insert the drawing as markdown image
-        console.log("Inserting drawing into note...");
         updateContentWithHistory((c) => {
           const newContent = (c || "") + `\n![Sketch](${data})\n`;
-          console.log("New content length:", newContent.length);
           return newContent;
         });
         setShowDrawingModal(false);
       } catch (err) {
-        console.error("Save drawing failed:", err);
         toast.error("Failed to insert drawing.");
       }
     };
@@ -713,7 +753,7 @@ const Editor = ({
             </h3>
             <button
               onClick={() => setShowDrawingModal(false)}
-              className="cursor-pointer text-gray-400 hover:text-gray-600 p-1 rounded-md hover:bg-gray-200 transition-all active:scale-95"
+              className="point text-gray-400 hover:text-gray-600 p-1 rounded-md hover:bg-gray-200 transition-all active:scale-95"
               aria-label="Close drawing modal"
             >
               <span className="text-xl">✕</span>
@@ -733,7 +773,7 @@ const Editor = ({
                   max="20"
                   value={lineWidth}
                   onChange={(e) => setLineWidth(parseInt(e.target.value))}
-                  className="cursor-pointer w-24 h-2 bg-gray-200 hover:bg-gray-300 rounded-full appearance-none transition-colors"
+                  className="point w-24 h-2 bg-gray-200 hover:bg-gray-300 rounded-full appearance-none transition-colors"
                 />
                 <span className="text-xs text-gray-500 font-medium min-w-8 text-right -ml-[25px]">
                   {lineWidth}
@@ -747,12 +787,12 @@ const Editor = ({
                   type="color"
                   value={lineColor}
                   onChange={(e) => setLineColor(e.target.value)}
-                  className="cursor-pointer w-8 h-8 rounded border border-gray-300 hover:border-gray-400 transition-colors"
+                  className="point w-8 h-8 rounded border border-gray-300 hover:border-gray-400 transition-colors"
                 />
               </div>
               <button
                 onClick={clearCanvas}
-                className="cursor-pointer ml-auto px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 rounded-md transition-colors active:scale-95"
+                className="point ml-auto px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 rounded-md transition-colors active:scale-95"
               >
                 Clear
               </button>
@@ -777,13 +817,13 @@ const Editor = ({
           <div className="flex justify-end gap-2 p-4 border-t border-gray-100 bg-gray-50">
             <button
               onClick={() => setShowDrawingModal(false)}
-              className="cursor-pointer px-4 py-2 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 hover:border-gray-300 rounded-lg transition-all active:scale-95"
+              className="point px-4 py-2 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 hover:border-gray-300 rounded-lg transition-all active:scale-95"
             >
               Cancel
             </button>
             <button
               onClick={saveDrawing}
-              className="cursor-pointer px-5 py-2 text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800 rounded-lg transition-all active:scale-95 shadow-sm"
+              className="point px-5 py-2 text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800 rounded-lg transition-all active:scale-95 shadow-sm"
             >
               Insert Drawing
             </button>
@@ -836,7 +876,6 @@ const Editor = ({
           flushList();
           const altText = imgMatch[1];
           const imgSrc = imgMatch[2];
-          console.log("Image found:", { altText, srcLength: imgSrc.length });
           rendered.push(
             <div key={`img-${i}`} className="flex justify-center my-6">
               <img
@@ -852,10 +891,6 @@ const Editor = ({
 
         // If line looks like image markdown but isn't matching, log it for debugging
         if (line.includes("![") && line.includes("](")) {
-          console.warn(
-            "Line looks like image but didn't match regex:",
-            line.substring(0, 100)
-          );
         }
 
         // headings
@@ -1081,7 +1116,7 @@ const Editor = ({
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
           aria-label={ariaLabel}
-          className={`cursor-pointer transition-colors pointer-events-auto ${className}`}
+          className={`point transition-colors pointer-events-auto ${className}`}
           type="button"
         >
           <Icon className="w-4 h-4" />
@@ -1158,7 +1193,7 @@ const Editor = ({
           }}
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
-          className={`cursor-pointer p-2.5 rounded-lg transition-all active:scale-95 shrink-0 ${
+          className={`point p-2.5 rounded-lg transition-all active:scale-95 shrink-0 ${
             active
               ? "bg-indigo-100 text-indigo-700 shadow-sm"
               : "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
@@ -1300,7 +1335,7 @@ const Editor = ({
           onClick={handleButtonClick}
           onMouseEnter={handleButtonMouseEnter}
           onMouseLeave={handleButtonMouseLeave}
-          className="cursor-pointer p-2.5 rounded-lg transition-all active:scale-95 shrink-0 text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+          className="point p-2.5 rounded-lg transition-all active:scale-95 shrink-0 text-gray-600 hover:bg-gray-200 hover:text-gray-900"
           aria-label="Select Heading"
           type="button"
         >
@@ -1343,7 +1378,7 @@ const Editor = ({
                       }
                     }}
                     onMouseLeave={() => setHoveredHeading(null)}
-                    className={`cursor-pointer px-3 py-2 text-left text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 ${
+                    className={`point px-3 py-2 text-left text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 ${
                       heading.diffClass1
                         ? "rounded-t-lg"
                         : heading.diffClass2 && "rounded-b-lg"
@@ -1438,7 +1473,7 @@ const Editor = ({
                 <div className="flex gap-3">
                   <button
                     onClick={() => setShowDeleteConfirm(false)}
-                    className="cursor-pointer flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                    className="point flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
                   >
                     Cancel
                   </button>
@@ -1447,7 +1482,7 @@ const Editor = ({
                       setShowDeleteConfirm(false);
                       onDelete(note.id);
                     }}
-                    className="cursor-pointer flex-1 px-4 py-2.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+                    className="point flex-1 px-4 py-2.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
                   >
                     Delete
                   </button>
@@ -1465,7 +1500,7 @@ const Editor = ({
             {!isNoteListOpen && (
               <button
                 onClick={onToggleNoteList}
-                className="cursor-pointer p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                className="point p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
                 aria-label="Open note list"
               >
                 <PanelLeftOpen className="w-4 h-4" />
@@ -1491,12 +1526,12 @@ const Editor = ({
             <ActionBtn
               onClick={handleSave}
               icon={Save}
-              disabled={isSaving || !title.trim()}
-              tooltip="Save note"
+              disabled={isSaving || !title.trim() || !hasUnsavedChanges}
+              tooltip={!hasUnsavedChanges ? "No changes to save" : "Save note"}
               ariaLabel="Save note"
               className={`p-2 rounded-full transition-colors ${
-                isSaving
-                  ? "text-gray-400 opacity-50"
+                isSaving || !hasUnsavedChanges
+                  ? "text-gray-400 opacity-50 cursor-not-allowed"
                   : "text-gray-400 hover:text-indigo-600 hover:bg-indigo-50"
               }`}
             />
@@ -1537,10 +1572,19 @@ const Editor = ({
           <ActionBtn
             onClick={handleCopy}
             icon={Copy}
-            tooltip="Copy content (Cmd/Ctrl+C)"
+            disabled={!hasUnsavedChanges && !content.trim()}
+            tooltip={
+              !content.trim()
+                ? "No content to copy"
+                : "Copy content (Cmd/Ctrl+C)"
+            }
             ariaLabel="Copy content (Cmd/Ctrl+C)"
             tooltipPosition="bottom"
-            className="p-2 rounded-full hover:bg-blue-50 text-gray-400 hover:text-blue-600"
+            className={`p-2 rounded-full ${
+              !hasUnsavedChanges && !content.trim()
+                ? "text-gray-300 opacity-50 cursor-not-allowed"
+                : "hover:bg-blue-50 text-gray-400 hover:text-blue-600"
+            }`}
           />
           <ActionBtn
             onClick={() => setShowDeleteConfirm(true)}
@@ -1629,7 +1673,10 @@ const Editor = ({
 
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
-        <div className="flex-1 flex flex-col overflow-y-auto bg-white">
+        <div
+          className="flex-1 flex flex-col overflow-y-auto bg-white editor-container"
+          style={{ transition: "opacity 0.3s ease-out" }}
+        >
           <div className="max-w-5xl w-full px-6 py-10 md:px-12 flex-1 flex flex-col">
             <input
               type="text"
@@ -1645,7 +1692,21 @@ const Editor = ({
               onChange={(newContent) => updateContentWithHistory(newContent)}
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
+              onSelectNote={(noteId) => {
+                // Trigger fade out effect
+                const editorElement =
+                  document.querySelector(".editor-container");
+                if (editorElement) {
+                  editorElement.style.opacity = "0";
+                  editorElement.style.transition = "opacity 0.3s ease-out";
+                }
+                // After fade out, select the note
+                setTimeout(() => {
+                  onSelectNote(noteId);
+                }, 300);
+              }}
               placeholder="Start writing..."
+              notes={notes}
             />
           </div>
         </div>
@@ -1669,21 +1730,21 @@ const Editor = ({
               </div>
               <button
                 onClick={() => handleAiAction("improve")}
-                className="cursor-pointer w-full text-left px-3 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-xl flex items-center gap-3 transition-colors"
+                className="point w-full text-left px-3 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-xl flex items-center gap-3 transition-colors"
                 aria-label="Improve writing with AI"
               >
                 <Sparkles className="w-4 h-4" /> Improve Writing
               </button>
               <button
                 onClick={() => handleAiAction("fix_grammar")}
-                className="cursor-pointer w-full text-left px-3 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-xl flex items-center gap-3 transition-colors"
+                className="point w-full text-left px-3 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-xl flex items-center gap-3 transition-colors"
                 aria-label="Fix grammar with AI"
               >
                 <CheckSquare className="w-4 h-4" /> Fix Grammar
               </button>
               <button
                 onClick={() => handleAiAction("make_todo")}
-                className="cursor-pointer w-full text-left px-3 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-xl flex items-center gap-3 transition-colors"
+                className="point w-full text-left px-3 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-xl flex items-center gap-3 transition-colors"
                 aria-label="Generate to-do list from content"
               >
                 <List className="w-4 h-4" /> Generate To-Do List
@@ -1691,14 +1752,14 @@ const Editor = ({
               <div className="h-px bg-gray-100 my-1" />
               <button
                 onClick={() => handleAiAction("summarize")}
-                className="cursor-pointer w-full text-left px-3 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-xl flex items-center gap-3 transition-colors"
+                className="point w-full text-left px-3 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-xl flex items-center gap-3 transition-colors"
                 aria-label="Summarize content with AI"
               >
                 <Columns className="w-4 h-4" /> Summarize
               </button>
               <button
                 onClick={() => handleAiAction("continue")}
-                className="cursor-pointer w-full text-left px-3 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-xl flex items-center gap-3 transition-colors"
+                className="point w-full text-left px-3 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-xl flex items-center gap-3 transition-colors"
                 aria-label="Continue writing with AI"
               >
                 <PenTool className="w-4 h-4" /> Continue Writing
@@ -1709,7 +1770,7 @@ const Editor = ({
         <button
           onClick={() => setAiMenuOpen(!aiMenuOpen)}
           disabled={isAiLoading}
-          className={`cursor-pointer w-14 h-14 bg-gray-900 text-white rounded-full shadow-xl shadow-gray-400/50 flex items-center justify-center transition-all transform hover:scale-105 active:scale-95 hover:bg-black ${
+          className={`point w-14 h-14 bg-gray-900 text-white rounded-full shadow-xl shadow-gray-400/50 flex items-center justify-center transition-all transform hover:scale-105 active:scale-95 hover:bg-black ${
             isAiLoading ? "animate-pulse cursor-wait" : ""
           }`}
           aria-label={aiMenuOpen ? "Close AI assistant" : "Open AI assistant"}

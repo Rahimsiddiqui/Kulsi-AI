@@ -170,12 +170,8 @@ export const authService = {
     });
 
     if (!response.ok) {
-      console.log("[getCurrentUser] Response not ok:", response.status);
       // Clear invalid token from localStorage
       if (response.status === 401 && token) {
-        console.log(
-          "[getCurrentUser] Clearing invalid token from localStorage"
-        );
         localStorage.removeItem("token");
         localStorage.removeItem("user");
       }

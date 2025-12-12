@@ -17,6 +17,19 @@ const noteSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    links: [
+      {
+        targetNoteId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Note",
+          required: true,
+        },
+        targetNoteTitle: {
+          type: String,
+          required: true,
+        },
+      },
+    ],
     isPinned: {
       type: Boolean,
       default: false,

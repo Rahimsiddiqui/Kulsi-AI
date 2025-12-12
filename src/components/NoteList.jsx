@@ -39,10 +39,10 @@ const NoteList = ({
           </h2>
           <button
             onClick={onToggle}
-            className="cursor-pointer p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            className="point p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
             aria-label="Close note list"
           >
-            <PanelLeftClose className="w-5 h-5" />
+            <PanelLeftClose className="w-h" />
           </button>
         </div>
         <div className="relative group">
@@ -79,7 +79,7 @@ const NoteList = ({
                 transition={{ delay: i * 0.05 }}
                 key={note.id}
                 onClick={() => onSelectNote(note.id)}
-                className={`cursor-pointer w-full text-left p-4 rounded-xl transition-all duration-200 group relative border shadow-sm ${
+                className={`point w-full text-left p-4 rounded-xl transition-all duration-200 group relative border shadow-sm ${
                   selectedNoteId === note.id
                     ? "bg-white border-indigo-500 shadow-md ring-1 ring-indigo-500/20 z-10"
                     : "bg-white border-gray-200 hover:border-indigo-300 hover:shadow-md"

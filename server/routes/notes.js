@@ -19,7 +19,6 @@ const authMiddleware = async (req, res, next) => {
     const token = authHeader?.split(" ")[1];
 
     if (!token) {
-      console.warn("[NOTES AUTH] No token provided in request");
       return res.status(401).json({ error: "No token provided" });
     }
 
@@ -27,7 +26,6 @@ const authMiddleware = async (req, res, next) => {
     req.userId = decoded.id || decoded.userId;
     next();
   } catch (error) {
-    console.error("[NOTES AUTH] Token verification failed:", error.message);
     return res.status(401).json({ error: "Invalid token" });
   }
 };
@@ -46,7 +44,6 @@ router.get("/", async (req, res) => {
       .exec();
     res.json(notes);
   } catch (error) {
-    console.error("Error fetching notes:", error);
     res.status(500).json({ error: "Failed to fetch notes" });
   }
 });
@@ -63,7 +60,6 @@ router.get("/:id", async (req, res) => {
     }
     res.json(note);
   } catch (error) {
-    console.error("Error fetching note:", error);
     res.status(500).json({ error: "Failed to fetch note" });
   }
 });
@@ -98,7 +94,6 @@ router.post("/", async (req, res) => {
     await note.save();
     res.status(201).json(note);
   } catch (error) {
-    console.error("Error creating note:", error);
     res.status(500).json({ error: "Failed to create note" });
   }
 });
@@ -106,7 +101,28 @@ router.post("/", async (req, res) => {
 // PUT /api/notes/:id - Update note
 router.put("/:id", async (req, res) => {
   try {
-    const { title, content, isPinned, isArchived, tags, color } = req.body;
+    const { title, content, isPinned, isArchived, tags, color, links } =
+      req.body;
+
+    // Process links: add targetNoteTitle if not provided
+    let processedLinks = [];
+    if (links && Array.isArray(links)) {
+      for (const link of links) {
+        if (link.targetNoteId) {
+          const targetNote = await Note.findOne({
+            _id: link.targetNoteId,
+            userId: req.userId,
+          });
+          if (targetNote) {
+            processedLinks.push({
+              targetNoteId: link.targetNoteId,
+              targetNoteTitle: link.targetNoteTitle || targetNote.title,
+            });
+          }
+        }
+      }
+    }
+
     const note = await Note.findOneAndUpdate(
       {
         _id: req.params.id,
@@ -120,6 +136,7 @@ router.put("/:id", async (req, res) => {
           isArchived,
           tags,
           color,
+          links: processedLinks,
           updatedAt: new Date(),
         },
       },
@@ -130,7 +147,6 @@ router.put("/:id", async (req, res) => {
     }
     res.json(note);
   } catch (error) {
-    console.error("Error updating note:", error);
     res.status(500).json({ error: "Failed to update note" });
   }
 });
@@ -158,7 +174,6 @@ router.delete("/:id", async (req, res) => {
     }
     res.json(note);
   } catch (error) {
-    console.error("Error deleting note:", error);
     res.status(500).json({ error: "Failed to delete note" });
   }
 });
@@ -179,7 +194,6 @@ router.post("/:id/restore", async (req, res) => {
     }
     res.json(note);
   } catch (error) {
-    console.error("Error restoring note:", error);
     res.status(500).json({ error: "Failed to restore note" });
   }
 });

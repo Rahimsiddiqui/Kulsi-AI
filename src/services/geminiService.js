@@ -71,7 +71,6 @@ export const generateNoteEnhancement = async (action, content, context) => {
     if (error.name === "AbortError") {
       throw new Error("AI request timeout. Please try again.");
     }
-    console.error("Gemini API Error:", error);
     throw new Error(
       error.message || "Failed to generate AI content. Please try again."
     );
@@ -127,14 +126,12 @@ export const generateFlashcards = async (content) => {
       }
       return parsed;
     } catch (parseError) {
-      console.error("Failed to parse flashcard JSON:", text);
       return [];
     }
   } catch (e) {
     if (e.name === "AbortError") {
       throw new Error("Flashcard generation timeout. Please try again.");
     }
-    console.error("Failed to generate flashcards", e);
     throw new Error(
       e.message || "Failed to generate flashcards. Please try again."
     );

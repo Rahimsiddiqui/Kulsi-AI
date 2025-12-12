@@ -34,7 +34,6 @@ export const authMiddleware = async (req, res, next) => {
     const token = authHeader?.split(" ")[1];
 
     if (!token) {
-      console.warn("[AUTH] No token provided in request");
       return res.status(401).json({ message: "No token provided" });
     }
 
@@ -47,7 +46,6 @@ export const authMiddleware = async (req, res, next) => {
       const user = await User.findById(req.userId);
 
       if (!user) {
-        console.warn(`[AUTH] User not found for ID: ${req.userId}`);
         return res.status(401).json({ message: "User not found" });
       }
 
@@ -57,7 +55,6 @@ export const authMiddleware = async (req, res, next) => {
       return res.status(401).json({ message: "Invalid token" });
     }
   } catch (err) {
-    console.error("[AUTH] Middleware error:", err);
     return res.status(401).json({ message: "Invalid token" });
   }
 };
@@ -119,7 +116,6 @@ router.post("/signup", async (req, res) => {
       email: user.email,
     });
   } catch (err) {
-    console.error("[ERROR] Signup failed:", err);
     res.status(500).json({ message: err.message || "Server error" });
   }
 });
@@ -201,7 +197,6 @@ router.post("/login", async (req, res) => {
       },
     });
   } catch (err) {
-    console.error("[ERROR] Login failed:", err);
     res.status(500).json({ message: err.message || "Server error" });
   }
 });
@@ -262,7 +257,6 @@ router.post("/verify-email", async (req, res) => {
       },
     });
   } catch (err) {
-    console.error("[ERROR] Email verification failed:", err);
     res.status(500).json({ message: err.message || "Server error" });
   }
 });
@@ -314,12 +308,11 @@ router.post("/resend-code", async (req, res) => {
 
     res.json({ message: "Verification code sent to email" });
   } catch (err) {
-    console.error("[ERROR] Resend code failed:", err);
     res.status(500).json({ message: err.message || "Server error" });
   }
 });
 
-// Change Password (Protected)
+// Change Password
 router.post("/change-password", authMiddleware, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
@@ -351,12 +344,11 @@ router.post("/change-password", authMiddleware, async (req, res) => {
 
     res.json({ message: "Password changed successfully" });
   } catch (err) {
-    console.error("[ERROR] Change password failed:", err);
     res.status(500).json({ message: err.message || "Server error" });
   }
 });
 
-// Delete Account (Protected)
+// Delete Account
 router.post("/delete-account", authMiddleware, async (req, res) => {
   try {
     const { password } = req.body;
@@ -381,7 +373,6 @@ router.post("/delete-account", authMiddleware, async (req, res) => {
     res.clearCookie("authToken");
     res.json({ message: "Account deleted successfully" });
   } catch (err) {
-    console.error("[ERROR] Delete account failed:", err);
     res.status(500).json({ message: err.message || "Server error" });
   }
 });
@@ -391,7 +382,6 @@ router.post("/oauth/google", (req, res) => {
   const redirectUri = `${
     process.env.FRONTEND_URL || "http://localhost:5173"
   }/auth/callback`;
-  console.log("[Google OAuth Initiate] Redirect URI:", redirectUri);
 
   const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?${new URLSearchParams(
     {
@@ -410,7 +400,6 @@ router.post("/oauth/github", (req, res) => {
   const redirectUri = `${
     process.env.FRONTEND_URL || "http://localhost:5173"
   }/auth/callback`;
-  console.log("[GitHub OAuth Initiate] Redirect URI:", redirectUri);
 
   const githubAuthUrl = `https://github.com/login/oauth/authorize?${new URLSearchParams(
     {
@@ -444,18 +433,11 @@ router.post("/oauth/callback", async (req, res) => {
     // Check if this code was already processed
     if (oauthCodeCache.has(codeKey)) {
       const cachedResult = oauthCodeCache.get(codeKey);
-      console.log(
-        `[OAuth Callback] Returning cached result for ${provider}: ${code.substring(
-          0,
-          10
-        )}...`
-      );
       return res.status(cachedResult.status).json(cachedResult.data);
     }
 
     const JWT_SECRET = process.env.JWT_SECRET;
     if (!JWT_SECRET) {
-      console.error("[ERROR] JWT_SECRET is not configured");
       return res
         .status(500)
         .json({ message: "Server configuration error: JWT_SECRET not set" });
@@ -465,30 +447,19 @@ router.post("/oauth/callback", async (req, res) => {
       process.env.FRONTEND_URL || "http://localhost:5173"
     }/auth/callback`;
 
-    console.log(
-      `[OAuth Callback] Provider: ${provider}, Redirect URI: ${redirectUri}`
-    );
-
     // Exchange code for access token
     const accessToken = await exchangeCodeForToken(provider, code, redirectUri);
-    console.log(`[OAuth Callback] Access token obtained for ${provider}`);
 
     // Get OAuth user info
     const oauthUser = await getOAuthUserInfo(provider, accessToken);
-    console.log(`[OAuth Callback] OAuth user retrieved: ${oauthUser.email}`);
 
     // Find or create user
     const user = await findOrCreateOAuthUser(User, oauthUser);
-    console.log(`[OAuth Callback] User found or created: ${user._id}`);
 
     // Generate JWT token
     const token = jwt.sign({ id: user._id }, JWT_SECRET, {
       expiresIn: "7d",
     });
-
-    console.log(`[OAuth Callback] JWT token generated for user ${user._id}`);
-    console.log(`[OAuth Callback] Token: ${token.substring(0, 50)}...`);
-    console.log(`[OAuth Callback] JWT_SECRET length: ${JWT_SECRET.length}`);
 
     const responseData = {
       message: "OAuth authentication successful",
@@ -511,9 +482,6 @@ router.post("/oauth/callback", async (req, res) => {
 
     res.status(200).json(responseData);
   } catch (err) {
-    console.error("[ERROR] OAuth callback failed:", err);
-    console.error("[ERROR] Stack:", err.stack);
-
     // Cache error responses for 1 minute to prevent retry spam
     const codeKey = `${provider}:${code}`;
     const errorData = {
@@ -590,7 +558,6 @@ router.post("/oauth/link", authMiddleware, async (req, res) => {
       },
     });
   } catch (err) {
-    console.error("[ERROR] OAuth link failed:", err);
     res.status(500).json({
       message: "Failed to link OAuth account",
       error: err.message,
@@ -624,7 +591,6 @@ router.delete(
         res.status(404).json({ message: "OAuth account not connected" });
       }
     } catch (err) {
-      console.error("[ERROR] OAuth disconnect failed:", err);
       res.status(500).json({ message: "Server error" });
     }
   }

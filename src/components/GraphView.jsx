@@ -229,7 +229,7 @@ const GraphView = ({ notes, onSelectNote }) => {
   return (
     <div
       ref={containerRef}
-      className="w-full h-48 bg-gray-50 relative overflow-hidden rounded-lg border border-gray-200"
+      className="w-full h-full bg-gray-50 relative overflow-hidden rounded-lg border border-gray-200"
     >
       <canvas ref={canvasRef} className="absolute inset-0 block" />
       <div className="absolute top-4 right-4 bg-white/80 backdrop-blur p-2 rounded-lg shadow text-xs text-gray-500">

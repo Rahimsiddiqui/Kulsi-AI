@@ -17,11 +17,7 @@ class ErrorBoundary extends Component {
   }
 
   componentDidCatch(error, errorInfo) {
-    console.error("Uncaught error:", error, errorInfo);
     this.setState({ errorInfo });
-
-    // Send to error tracking service (e.g., Sentry)
-    // Example: Sentry.captureException(error, { contexts: { react: errorInfo } });
   }
 
   handleCopyError = () => {

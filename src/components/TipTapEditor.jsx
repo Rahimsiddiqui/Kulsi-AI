@@ -7,12 +7,14 @@ import React, {
   useCallback,
 } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
+import { Mark } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
 import Strike from "@tiptap/extension-strike";
 import LinkModal from "./LinkModal";
+import { toast } from "react-toastify";
 
 const TipTapEditor = forwardRef(
   (
@@ -21,7 +23,9 @@ const TipTapEditor = forwardRef(
       onChange = () => {},
       onKeyDown = () => {},
       onPaste = () => {},
+      onSelectNote = () => {},
       placeholder = "Start writing...",
+      notes = [],
     },
     ref
   ) => {
@@ -132,7 +136,20 @@ const TipTapEditor = forwardRef(
             const src = el.getAttribute("src") || "";
             return `![${alt}](${src})`;
           case "div":
+            return inner;
           case "span":
+            // Check if this is an internal note link
+            const dataId = el.getAttribute("data-note-id");
+            const dataName = el.getAttribute("data-note-name");
+            const className = el.getAttribute("class") || "";
+            if (
+              dataId &&
+              (className.includes("internal-note-link") ||
+                className.includes("note-link"))
+            ) {
+              // Use special markdown syntax: [[displayText|noteId|noteName]]
+              return `[[${inner}|${dataId}|${dataName}]]`;
+            }
             return inner;
           default:
             return inner;
@@ -148,6 +165,14 @@ const TipTapEditor = forwardRef(
       if (!markdown) return "<p></p>";
 
       let html = markdown;
+
+      // Convert special markdown syntax [[text|noteId|noteName]] back to spans
+      html = html.replace(
+        /\[\[([^|]+)\|([^|]+)\|([^\]]+)\]\]/g,
+        (match, text, noteId, noteName) => {
+          return `<span data-note-id="${noteId}" data-note-name="${noteName}" class="internal-note-link note-link point">${text}</span>`;
+        }
+      );
 
       // Code blocks (triple backticks)
       html = html.replace(/```(.*?)\n([\s\S]*?)\n```/g, (match, lang, code) => {
@@ -233,6 +258,9 @@ const TipTapEditor = forwardRef(
         (match, alt, url) => `<img src="${url}" alt="${alt}" />`
       );
       html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+
+      // Note: Wiki-style [[NoteName]] links are already converted to anchor tags
+      // by the TipTapEditor when inserting, so we don't need to convert them here
 
       // Paragraphs - split by double newlines, skip block elements
       // Only trim newlines, preserve internal spaces
@@ -331,7 +359,7 @@ const TipTapEditor = forwardRef(
           code: {
             HTMLAttributes: {
               class:
-                "inline-block bg-gray-100 text-pink-600 rounded px-1.5 py-0.5 font-mono text-sm border border-gray-200 min-w-[2.5em] min-h-[1.5em]",
+                "inline-block bg-gray-100 text-pink-600 rounded px-1.5 py-0.5 font-mono text-sm border border-gray-200 min-h-[1.5em]",
             },
           },
         }),
@@ -345,8 +373,7 @@ const TipTapEditor = forwardRef(
           linkOnPaste: true,
           autolink: true,
           HTMLAttributes: {
-            class:
-              "text-indigo-600 underline cursor-pointer hover:text-indigo-800",
+            class: "text-indigo-600 underline point hover:text-indigo-800",
             rel: "noopener noreferrer",
             target: "_blank",
           },
@@ -363,6 +390,63 @@ const TipTapEditor = forwardRef(
             class: "flex items-center gap-2",
           },
           nested: true,
+        }),
+        // Custom mark for internal note links
+        Mark.create({
+          name: "internalNoteLink",
+
+          addAttributes() {
+            return {
+              noteId: {
+                default: null,
+                parseHTML: (element) => element.getAttribute("data-note-id"),
+                renderHTML: (attributes) => ({
+                  "data-note-id": attributes.noteId,
+                }),
+              },
+              noteName: {
+                default: null,
+                parseHTML: (element) => element.getAttribute("data-note-name"),
+                renderHTML: (attributes) => ({
+                  "data-note-name": attributes.noteName,
+                }),
+              },
+            };
+          },
+
+          parseHTML() {
+            return [
+              {
+                tag: "span[data-note-id]",
+                getAttrs: (dom) => {
+                  const className = dom.getAttribute("class") || "";
+                  // Check if this is an internal-note-link by class or by presence of data-note-id
+                  if (
+                    className.includes("internal-note-link") ||
+                    className.includes("note-link")
+                  ) {
+                    return {
+                      noteId: dom.getAttribute("data-note-id"),
+                      noteName: dom.getAttribute("data-note-name"),
+                    };
+                  }
+                  return false;
+                },
+              },
+            ];
+          },
+          renderHTML({ mark }) {
+            return [
+              "span",
+              {
+                "data-note-id": mark.attrs.noteId,
+                "data-note-name": mark.attrs.noteName,
+                class:
+                  "internal-note-link point text-indigo-600 underline cursor-pointer font-medium hover:text-indigo-800 rounded px-0.5",
+              },
+              0,
+            ];
+          },
         }),
       ],
       content: markdownToHtml(value),
@@ -610,46 +694,126 @@ const TipTapEditor = forwardRef(
           .ProseMirror::selection {
             background-color: rgba(99, 102, 241, 0.2);
           }
+          .internal-note-link {
+            color: #4f46e5;
+            text-decoration: underline;
+            cursor: pointer;
+            font-weight: 500;
+          }
+          .internal-note-link:hover {
+            color: #4338ca;
+            background-color: rgba(99, 102, 241, 0.1);
+            border-radius: 2px;
+            padding: 0 2px;
+          }
         `}</style>
-        <EditorContent
-          editor={editor}
-          className="ProseMirror w-full"
-          style={{
-            whiteSpace: "pre-wrap",
-            wordWrap: "break-word",
-            userSelect: "text",
-            WebkitUserSelect: "text",
-          }}
-          onMouseUp={(e) => {
-            // Fix double-click selection to not include trailing space
-            const selection = window.getSelection();
-            if (selection.toString()) {
-              const range = selection.getRangeAt(0);
-              let endOffset = range.endOffset;
-              const endNode = range.endContainer;
+        <div
+          onClick={(e) => {
+            // Handle internal note link clicks - check target and parent chain
+            let target = e.target;
+            while (target && target.closest) {
+              const link = target.closest(".internal-note-link");
+              if (link) {
+                e.preventDefault();
+                e.stopPropagation();
+                const noteId = link.getAttribute("data-note-id");
+                const noteName = link.getAttribute("data-note-name");
 
-              // If the selection ends with a space, trim it
-              const text = endNode.textContent || "";
-              if (endOffset > 0 && text[endOffset - 1] === " ") {
-                range.setEnd(endNode, endOffset - 1);
+                // Validate note exists
+                const noteExists = notes.some(
+                  (n) => (n.id || n._id) === noteId
+                );
+
+                if (!noteExists) {
+                  toast.error(`Note "${noteName}" no longer exists`);
+                  return;
+                }
+
+                if (noteId && onSelectNote) {
+                  onSelectNote(noteId);
+                }
+                return;
               }
+              break;
             }
           }}
-        />
+        >
+          <EditorContent
+            editor={editor}
+            className="ProseMirror w-full"
+            style={{
+              whiteSpace: "pre-wrap",
+              wordWrap: "break-word",
+              userSelect: "text",
+              WebkitUserSelect: "text",
+            }}
+            onMouseUp={(e) => {
+              // Fix double-click selection to not include trailing space
+              const selection = window.getSelection();
+              if (selection.toString()) {
+                const range = selection.getRangeAt(0);
+                let endOffset = range.endOffset;
+                const endNode = range.endContainer;
+
+                // If the selection ends with a space, trim it
+                const text = endNode.textContent || "";
+                if (endOffset > 0 && text[endOffset - 1] === " ") {
+                  range.setEnd(endNode, endOffset - 1);
+                }
+              }
+            }}
+          />
+        </div>
         <LinkModal
           isOpen={isLinkModalOpen}
           onClose={() => setIsLinkModalOpen(false)}
-          onSubmit={(url) => {
+          onSubmit={(url, metadata = {}) => {
             if (linkEditorRef.current) {
-              linkEditorRef.current
-                .chain()
-                .focus()
-                .setLink({ href: url })
-                .run();
+              if (metadata.type === "internal") {
+                // For internal links, validate note exists
+                const noteName = url.replace(/\[\[|\]\]/g, "");
+                const noteExists = notes.some(
+                  (n) => n.title.toLowerCase() === noteName.toLowerCase()
+                );
+
+                if (!noteExists) {
+                  toast.error(`Note "${noteName}" not found`);
+                  setIsLinkModalOpen(true);
+                  return;
+                }
+
+                // Use displayText (selectedText) as the visible link text, or fall back to note name
+                const linkText = metadata.displayText || noteName;
+
+                // Get current cursor position
+                const { from } = linkEditorRef.current.state.selection;
+
+                // Insert text and apply mark
+                linkEditorRef.current
+                  .chain()
+                  .focus()
+                  .insertContent(linkText)
+                  .run();
+
+                // Now select the inserted text and apply the mark
+                const editor = linkEditorRef.current;
+                const to = editor.state.selection.from;
+                const start = to - linkText.length;
+
+                editor
+                  .chain()
+                  .setTextSelection({ from: start, to })
+                  .setMark("internalNoteLink", {
+                    noteId: metadata.noteId,
+                    noteName: noteName,
+                  })
+                  .run();
+              }
             }
             setIsLinkModalOpen(false);
           }}
           selectedText={linkSelectedText}
+          notes={notes}
         />
       </div>
     );

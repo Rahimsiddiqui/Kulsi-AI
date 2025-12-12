@@ -128,7 +128,7 @@ const VerifyEmail = ({ email, onSubmit, onResend, onBack }) => {
           >
             {loading ? (
               <>
-                <Loader2 className="w-5 h-5 animate-spin" />
+                <Loader2 className="w-h animate-spin" />
                 Verifying...
               </>
             ) : (
@@ -162,7 +162,7 @@ const VerifyEmail = ({ email, onSubmit, onResend, onBack }) => {
 
         <button
           onClick={onBack}
-          className="w-full mt-4 py-2.5 text-gray-600 hover:text-gray-900 font-medium transition-colors cursor-pointer"
+          className="w-full mt-4 py-2.5 text-gray-600 hover:text-gray-900 font-medium transition-colors point"
         >
           Back to Registration
         </button>

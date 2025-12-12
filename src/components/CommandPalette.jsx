@@ -102,7 +102,7 @@ const CommandPalette = ({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center border-b border-gray-100 px-4 py-3">
-          <Search className="w-5 h-5 text-gray-400 mr-3" />
+          <Search className="w-h text-gray-400 mr-3" />
           <input
             ref={inputRef}
             type="text"
@@ -134,7 +134,7 @@ const CommandPalette = ({
                     item.action();
                     onClose();
                   }}
-                  className={`cursor-pointer w-full text-left px-4 py-3 flex items-center justify-between transition-colors ${
+                  className={`point w-full text-left px-4 py-3 flex items-center justify-between transition-colors ${
                     idx === selectedIndex
                       ? "bg-indigo-50 text-indigo-900"
                       : "text-gray-700 hover:bg-gray-50"

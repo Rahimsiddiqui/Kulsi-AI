@@ -38,15 +38,13 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 // Auth Routes
-console.log("[DEBUG] Registering /api/auth routes");
 app.use("/api/auth", authRoutes);
 
 // Notes Routes
-console.log("[DEBUG] Registering /api/notes routes");
 app.use("/api/notes", notesRoutes);
 
 if (isProduction) {
-  console.log = () => {};
+  log = () => {};
 }
 
 // Serve static files from the dist directory
@@ -54,9 +52,6 @@ app.use(express.static(path.join(__dirname, "../dist")));
 
 // Catch-all SPA fallback (logs unhandled routes)
 app.use((req, res) => {
-  console.log(
-    `[DEBUG] Catch-all fallback for route: ${req.method} ${req.path}`
-  );
   res.sendFile(path.join(__dirname, "../dist/index.html"));
 });
 
@@ -95,7 +90,7 @@ async function startServer() {
 
     // Start server
     app.listen(PORT, () => {
-      console.log(`Server running on http://localhost:${PORT}`);
+      console.log(`Backend Server running on http://localhost:${PORT}`);
       if (mongoConnected) {
         console.log("✅ Database: Connected");
       } else {
