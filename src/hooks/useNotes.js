@@ -5,6 +5,7 @@ import {
   WELCOME_NOTE_CONTENT,
 } from "../../server/config/constants.js";
 import noteService from "../services/noteService.js";
+import { toast } from "react-toastify";
 
 // Generate unique IDs using better randomness
 const generateId = () => {
@@ -231,6 +232,7 @@ export const useNotes = () => {
     (id) => {
       // Permanent delete - remove from local state immediately
       setNotes((prev) => prev.filter((note) => note.id !== id));
+      toast.success("Note deleted successfully!");
 
       // Async: Sync deletion to MongoDB in background
       (async () => {

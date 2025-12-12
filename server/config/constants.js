@@ -28,7 +28,7 @@ Kulsi AI is a minimal, fast, and AI-powered note-taking app.
 - **WYSIWYG Editor**: Write with real-time visual formatting, no markdown syntax needed
 - **AI Assistant**: Click the ✨ icon to improve, fix grammar, summarize, or continue writing
 - **Organization**: Folders, tags, and pinned notes for easy access
-- **Bi-directional Links**: Link to other notes with [[note name]]
+- **Bi-directional Links**: Link to other notes with their [note name](http://localhost:5173)
 - **Task Management**: Use checkboxes to track your to-dos
 
 ## Keyboard Shortcuts:-

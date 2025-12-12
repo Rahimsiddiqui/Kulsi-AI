@@ -138,9 +138,16 @@ router.put("/:id", async (req, res) => {
 // DELETE /api/notes/:id - Delete note (soft delete to trash)
 router.delete("/:id", async (req, res) => {
   try {
+    const noteId = req.params.id;
+
+    // Validate MongoDB ObjectId format
+    if (!noteId.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ error: "Invalid note ID format" });
+    }
+
     const note = await Note.findOneAndUpdate(
       {
-        _id: req.params.id,
+        _id: noteId,
         userId: req.userId,
       },
       { $set: { isTrashed: true, updatedAt: new Date() } },

@@ -8,9 +8,11 @@ import React, {
 } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
+import Link from "@tiptap/extension-link";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
 import Strike from "@tiptap/extension-strike";
+import LinkModal from "./LinkModal";
 
 const TipTapEditor = forwardRef(
   (
@@ -26,6 +28,11 @@ const TipTapEditor = forwardRef(
     // Track if the change is coming from the editor itself (to prevent sync loops)
     const isInternalChangeRef = useRef(false);
     const lastMarkdownRef = useRef("");
+
+    // Link modal state
+    const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
+    const [linkSelectedText, setLinkSelectedText] = useState("");
+    const linkEditorRef = useRef(null);
 
     // Convert HTML to Markdown
     const htmlToMarkdown = (html) => {
@@ -46,17 +53,17 @@ const TipTapEditor = forwardRef(
 
         switch (el.tagName.toLowerCase()) {
           case "h1":
-            return `# ${inner.trim()}\n\n`;
+            return `# ${inner}\n\n`;
           case "h2":
-            return `## ${inner.trim()}\n\n`;
+            return `## ${inner}\n\n`;
           case "h3":
-            return `### ${inner.trim()}\n\n`;
+            return `### ${inner}\n\n`;
           case "h4":
-            return `#### ${inner.trim()}\n\n`;
+            return `#### ${inner}\n\n`;
           case "h5":
-            return `##### ${inner.trim()}\n\n`;
+            return `##### ${inner}\n\n`;
           case "h6":
-            return `###### ${inner.trim()}\n\n`;
+            return `###### ${inner}\n\n`;
           case "strong":
           case "b":
             return `**${inner}**`;
@@ -100,16 +107,14 @@ const TipTapEditor = forwardRef(
                   }
                   return walk(node);
                 })
-                .join("")
-                .trim();
+                .join("");
               return isChecked
                 ? `[x] ${textContent}\n`
                 : `[ ] ${textContent}\n`;
             }
-            const trimmedContent = inner.trim();
             // For list items, only output if they have content
             // Don't output bare hyphens as they're not valid list items
-            return trimmedContent ? `- ${trimmedContent}\n` : "";
+            return inner ? `- ${inner}\n` : "";
           case "input":
             // Don't output input elements - they're handled in the li case
             return "";
@@ -118,7 +123,7 @@ const TipTapEditor = forwardRef(
           case "pre":
             return `\`\`\`\n${el.textContent}\n\`\`\`\n\n`;
           case "blockquote":
-            return `> ${inner.trim()}\n\n`;
+            return `> ${inner}\n\n`;
           case "a":
             const href = el.getAttribute("href");
             return `[${inner}](${href})`;
@@ -134,7 +139,8 @@ const TipTapEditor = forwardRef(
         }
       };
 
-      return walk(div).replace(/\n{3,}/g, "\n\n");
+      // Preserve user's exact spacing - don't collapse newlines
+      return walk(div);
     };
 
     // Convert Markdown to HTML - proper handling of all elements
@@ -161,14 +167,14 @@ const TipTapEditor = forwardRef(
 
       // Unchecked: [ ] text
       html = html.replace(/^\[\s*\]\s*(.*)$/gm, (match, text) => {
-        const content = text.trim();
+        const content = text;
         return `<li data-type="taskItem" data-checked="false"><label><input type="checkbox">${
           content ? `<span>${content}</span>` : "<span></span>"
         }</label></li>`;
       });
       // Checked: [x] text
       html = html.replace(/^\[x\]\s*(.*)$/gim, (match, text) => {
-        const content = text.trim();
+        const content = text;
         return `<li data-type="taskItem" data-checked="true"><label><input type="checkbox" checked>${
           content ? `<span>${content}</span>` : "<span></span>"
         }</label></li>`;
@@ -178,8 +184,7 @@ const TipTapEditor = forwardRef(
       html = html.replace(
         /((?:<li data-type="taskItem"[^>]*>[\s\S]*?<\/li>\s*)+)/g,
         (match) => {
-          const trimmed = match.trim();
-          return `<ul data-type="taskList">${trimmed}</ul>`;
+          return `<ul data-type="taskList">${match}</ul>`;
         }
       );
 
@@ -195,7 +200,7 @@ const TipTapEditor = forwardRef(
       html = html.replace(
         /((?:<li(?![^>]*data-type)[^>]*>[\s\S]*?<\/li>\s*)+)/g,
         (match) => {
-          return `<ul>${match.trim()}</ul>`;
+          return `<ul>${match}</ul>`;
         }
       );
 
@@ -221,24 +226,26 @@ const TipTapEditor = forwardRef(
       // Inline code
       html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
 
-      // Links + Images
-      html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+      // Links + Images - handle data URLs with parentheses
+      // Process images first (with greedy matching for URLs with parentheses)
       html = html.replace(
-        /!\[([^\]]*)\]\(([^)]+)\)/g,
-        '<img src="$2" alt="$1" />'
+        /!\[([^\]]*)\]\((.+)\)/g,
+        (match, alt, url) => `<img src="${url}" alt="${alt}" />`
       );
+      html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
 
       // Paragraphs - split by double newlines, skip block elements
+      // Only trim newlines, preserve internal spaces
       const parts = html.split(/\n\n+/);
       html = parts
         .map((part) => {
-          const trimmed = part.trim();
-          if (!trimmed) return "";
+          const trimmedNewlines = part.replace(/^\n+|\n+$/g, "");
+          if (!trimmedNewlines) return "";
           // Skip if already a block element
-          if (/^</.test(trimmed)) {
-            return trimmed;
+          if (/^</.test(trimmedNewlines)) {
+            return trimmedNewlines;
           }
-          return `<p>${trimmed}</p>`;
+          return `<p>${trimmedNewlines}</p>`;
         })
         .join("");
 
@@ -253,6 +260,17 @@ const TipTapEditor = forwardRef(
       extensions: [
         StarterKit.configure({
           strike: false,
+          blockquote: {
+            addKeyboardShortcuts() {
+              return {
+                "Mod-Shift-b": () => this.editor.commands.toggleBlockquote(),
+              };
+            },
+            HTMLAttributes: {
+              class:
+                "border-l-4 border-indigo-300 pl-4 py-1 my-2 text-gray-600 bg-gray-50/50 italic rounded-r",
+            },
+          },
           paragraph: {
             HTMLAttributes: {
               class: "leading-8 text-gray-800",
@@ -310,22 +328,27 @@ const TipTapEditor = forwardRef(
                 "bg-gray-800 text-gray-200 p-4 rounded-lg my-4 font-mono text-sm overflow-x-auto shadow-inner border border-gray-700",
             },
           },
-          blockquote: {
-            HTMLAttributes: {
-              class:
-                "border-l-4 border-indigo-300 pl-4 py-1 my-2 text-gray-600 bg-gray-50/50 italic rounded-r",
-            },
-          },
           code: {
             HTMLAttributes: {
               class:
-                "bg-gray-100 text-pink-600 rounded px-1.5 py-0.5 font-mono text-sm border border-gray-200",
+                "inline-block bg-gray-100 text-pink-600 rounded px-1.5 py-0.5 font-mono text-sm border border-gray-200 min-w-[2.5em] min-h-[1.5em]",
             },
           },
         }),
         Strike.configure({
           HTMLAttributes: {
             class: "line-through",
+          },
+        }),
+        Link.configure({
+          openOnClick: false,
+          linkOnPaste: true,
+          autolink: true,
+          HTMLAttributes: {
+            class:
+              "text-indigo-600 underline cursor-pointer hover:text-indigo-800",
+            rel: "noopener noreferrer",
+            target: "_blank",
           },
         }),
         TaskList.configure({
@@ -412,7 +435,7 @@ const TipTapEditor = forwardRef(
             "**": "bold",
             "*": "italic",
             __: "underline",
-            "~~": "strikethrough",
+            "~~": "strike",
             "`": "code",
           };
 
@@ -422,8 +445,27 @@ const TipTapEditor = forwardRef(
           // This properly handles adding/removing marks without losing formatting
           if (markName) {
             editor.chain().focus().toggleMark(markName).run();
+          } else if (before === "[" && after === "](url)") {
+            // Handle links specially using TipTap's link command
+            const { from, to } = editor.state.selection;
+            const selectedText = editor.state.doc.textBetween(from, to);
+
+            if (selectedText.length > 0) {
+              // If text is selected, open modal for URL
+              setLinkSelectedText(selectedText);
+              linkEditorRef.current = editor;
+              setIsLinkModalOpen(true);
+            } else {
+              // No selection - insert placeholder
+              editor
+                .chain()
+                .focus()
+                .insertContent("link")
+                .setLink({ href: "https://" })
+                .run();
+            }
           } else {
-            // For non-mark formatting (like links), use the original logic
+            // For other formatting (like images), use the original logic
             const { from, to } = editor.state.selection;
             const selectedText = editor.state.doc.textBetween(from, to);
 
@@ -461,20 +503,25 @@ const TipTapEditor = forwardRef(
         if (!editor) return;
 
         try {
-          // Get current position
-          const { from } = editor.state.selection;
+          // Handle blockquote specially
+          if (prefix === "> ") {
+            editor.chain().focus().toggleBlockquote().run();
+          } else {
+            // Get current position
+            const { from } = editor.state.selection;
 
-          // Find the start of the current line
-          const $pos = editor.state.doc.resolve(from);
-          const lineStart = $pos.start();
+            // Find the start of the current line
+            const $pos = editor.state.doc.resolve(from);
+            const lineStart = $pos.start();
 
-          // Go to line start and insert prefix
-          editor
-            .chain()
-            .focus()
-            .setSelection(lineStart)
-            .insertContent(prefix)
-            .run();
+            // Go to line start and insert prefix
+            editor
+              .chain()
+              .focus()
+              .setSelection(lineStart)
+              .insertContent(prefix)
+              .run();
+          }
         } catch (err) {
           console.error("insertBlock error:", err);
         }
@@ -546,6 +593,15 @@ const TipTapEditor = forwardRef(
         if (!editor) return "";
         return editor.getHTML();
       },
+      submitLink: (url) => {
+        if (!linkEditorRef.current) return;
+        linkEditorRef.current.chain().focus().setLink({ href: url }).run();
+      },
+      hasSelection: () => {
+        if (!editor) return false;
+        const { from, to } = editor.state.selection;
+        return from !== to;
+      },
     }));
 
     return (
@@ -579,6 +635,21 @@ const TipTapEditor = forwardRef(
               }
             }
           }}
+        />
+        <LinkModal
+          isOpen={isLinkModalOpen}
+          onClose={() => setIsLinkModalOpen(false)}
+          onSubmit={(url) => {
+            if (linkEditorRef.current) {
+              linkEditorRef.current
+                .chain()
+                .focus()
+                .setLink({ href: url })
+                .run();
+            }
+            setIsLinkModalOpen(false);
+          }}
+          selectedText={linkSelectedText}
         />
       </div>
     );

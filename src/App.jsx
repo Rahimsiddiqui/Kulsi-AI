@@ -239,7 +239,9 @@ const AppContent = () => {
 
           {/* Sidebar Drawer */}
           <motion.div
-            className={`fixed md:relative z-50 h-full shadow-2xl md:shadow-none shrink-0 bg-gray-50 border-r border-gray-200/60`}
+            className={`fixed md:relative h-full shadow-2xl md:shadow-none shrink-0 bg-gray-50 border-r border-gray-200/60 ${
+              isCommandPaletteOpen ? "z-1" : "z-50"
+            }`}
             initial={false}
             animate={{
               x: isDesktop ? 0 : sidebarOpen ? 0 : "-100%",

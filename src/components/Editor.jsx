@@ -313,9 +313,13 @@ const Editor = ({
       const modKey = isMac ? e.metaKey : e.ctrlKey;
 
       // Copy with Markup: Ctrl/Cmd + C (plain copy)
+      // Only intercept copy if there's NO selection - let browser handle selected text
       if (modKey && e.key.toLowerCase() === "c" && !e.altKey && !e.shiftKey) {
-        e.preventDefault();
-        handleCopy();
+        const hasSelection = window.getSelection().toString().length > 0;
+        if (!hasSelection) {
+          e.preventDefault();
+          handleCopy();
+        }
       }
       // Heading 2: Ctrl/Cmd + Alt + 1
       else if (modKey && e.altKey && e.key === "1") {
@@ -352,6 +356,30 @@ const Editor = ({
         e.preventDefault();
         setShowDrawingModal(true);
       }
+      // Link: Ctrl/Cmd + L
+      else if (
+        modKey &&
+        e.key.toLowerCase() === "l" &&
+        !e.altKey &&
+        !e.shiftKey
+      ) {
+        e.preventDefault();
+        if (!tiptapRef.current?.hasSelection()) {
+          toast.warning("Select a word please!");
+          return;
+        }
+        tiptapRef.current?.insertText("[", "](url)");
+      }
+      // Strikethrough: Ctrl/Cmd + Shift + X
+      else if (modKey && e.shiftKey && e.key.toLowerCase() === "x") {
+        e.preventDefault();
+        tiptapRef.current?.insertText("~~", "~~");
+      }
+      // Checkbox: Ctrl/Cmd + Shift + C
+      else if (modKey && e.shiftKey && e.key.toLowerCase() === "c") {
+        e.preventDefault();
+        tiptapRef.current?.toggleTaskList();
+      }
     },
     [handleCopy]
   );
@@ -366,8 +394,20 @@ const Editor = ({
       handleKeyDown(e);
     };
 
+    const handleCopyEvent = () => {
+      // Show toast when user copies selected text
+      const hasSelection = window.getSelection().toString().length > 0;
+      if (hasSelection) {
+        toast.success("Content successfully copied!");
+      }
+    };
+
     window.addEventListener("keydown", handleGlobalKeyDown);
-    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+    window.addEventListener("copy", handleCopyEvent);
+    return () => {
+      window.removeEventListener("keydown", handleGlobalKeyDown);
+      window.removeEventListener("copy", handleCopyEvent);
+    };
   }, [handleKeyDown]);
 
   const handleDrop = useCallback(
@@ -496,27 +536,41 @@ const Editor = ({
     const canvasRef = useRef(null);
     const isDrawingRef = useRef(false);
     const [lineWidth, setLineWidth] = useState(3);
-    const [lineColor, setLineColor] = useState("#000000");
+    const [lineColor, setLineColor] = useState("#1f2937");
+    const [isHovering, setIsHovering] = useState(false);
 
     useEffect(() => {
       const canvas = canvasRef.current;
       if (!canvas) return;
 
-      const rect = canvas.getBoundingClientRect();
-      const ratio = window.devicePixelRatio || 1;
-      canvas.width = Math.max(1, Math.floor(rect.width * ratio));
-      canvas.height = Math.max(1, Math.floor(rect.height * ratio));
+      // Use requestAnimationFrame to ensure DOM is fully laid out
+      const initCanvas = () => {
+        const rect = canvas.getBoundingClientRect();
+        const ratio = window.devicePixelRatio || 1;
 
-      const ctx = canvas.getContext("2d");
-      if (ctx) {
-        ctx.scale(ratio, ratio);
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, rect.width, rect.height);
-        ctx.lineWidth = lineWidth;
-        ctx.lineCap = "round";
-        ctx.lineJoin = "round";
-        ctx.strokeStyle = lineColor;
-      }
+        // Only set if canvas has actual dimensions
+        if (rect.width > 0 && rect.height > 0) {
+          canvas.width = Math.floor(rect.width * ratio);
+          canvas.height = Math.floor(rect.height * ratio);
+
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.scale(ratio, ratio);
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, rect.width, rect.height);
+            ctx.lineWidth = lineWidth;
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+            ctx.strokeStyle = lineColor;
+          }
+        }
+      };
+
+      // Try to init immediately, and again after a short delay
+      initCanvas();
+      const timer = setTimeout(initCanvas, 100);
+
+      return () => clearTimeout(timer);
     }, [lineWidth, lineColor]);
 
     const getPos = useCallback((e, canvas) => {
@@ -561,8 +615,10 @@ const Editor = ({
       };
 
       const stop = () => {
-        isDrawingRef.current = false;
-        ctx.beginPath();
+        if (isDrawingRef.current) {
+          isDrawingRef.current = false;
+          ctx.closePath();
+        }
       };
 
       canvas.addEventListener("mousedown", start);
@@ -572,6 +628,7 @@ const Editor = ({
       canvas.addEventListener("touchstart", start, { passive: false });
       canvas.addEventListener("touchmove", move, { passive: false });
       canvas.addEventListener("touchend", stop);
+      canvas.addEventListener("touchcancel", stop);
 
       return () => {
         canvas.removeEventListener("mousedown", start);
@@ -581,18 +638,52 @@ const Editor = ({
         canvas.removeEventListener("touchstart", start);
         canvas.removeEventListener("touchmove", move);
         canvas.removeEventListener("touchend", stop);
+        canvas.removeEventListener("touchcancel", stop);
       };
     }, [getPos, lineWidth, lineColor]);
 
     const saveDrawing = () => {
       try {
-        const data = canvasRef.current?.toDataURL("image/png");
-        if (data) {
-          updateContentWithHistory((c) => (c || "") + `\n![Sketch](${data})\n`);
-          setShowDrawingModal(false);
+        const canvas = canvasRef.current;
+        if (!canvas) {
+          toast.error("Canvas not found. Please try again.");
+          return;
         }
+
+        // Verify canvas has been drawn on
+        const rect = canvas.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) {
+          toast.error("Canvas has no dimensions. Please try again.");
+          return;
+        }
+
+        // Get canvas data URL
+        let data;
+        try {
+          data = canvas.toDataURL("image/png");
+          console.log("Canvas data URL length:", data.length);
+        } catch (err) {
+          console.error("Canvas export error:", err);
+          toast.error("Failed to export drawing. Please try again.");
+          return;
+        }
+
+        // Check if data URL is valid
+        if (!data || data.length < 100 || data === "data:,") {
+          console.warn("Invalid data URL:", data);
+          toast.error("Drawing is empty. Please draw something first.");
+          return;
+        }
+
+        // Insert the drawing as markdown image
+        console.log("Inserting drawing into note...");
+        updateContentWithHistory((c) => {
+          const newContent = (c || "") + `\n![Sketch](${data})\n`;
+          console.log("New content length:", newContent.length);
+          return newContent;
+        });
+        setShowDrawingModal(false);
       } catch (err) {
-        // eslint-disable-next-line no-console
         console.error("Save drawing failed:", err);
         toast.error("Failed to insert drawing.");
       }
@@ -612,25 +703,29 @@ const Editor = ({
         <motion.div
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="bg-white rounded-2xl shadow-2xl max-w-full max-h-[90vh] overflow-hidden flex flex-col w-full lg:w-4xl"
+          exit={{ scale: 0.9, opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          className="bg-white rounded-xl shadow-xl max-w-full max-h-[90vh] overflow-hidden flex flex-col w-full lg:w-4xl"
         >
-          <div className="flex justify-between items-center p-6 border-b border-gray-200 bg-linear-to-r from-indigo-50 to-blue-50">
-            <h3 className="text-xl font-bold text-gray-800">Drawing Canvas</h3>
+          <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 bg-gray-50">
+            <h3 className="text-lg font-semibold text-gray-900">
+              Drawing Canvas
+            </h3>
             <button
               onClick={() => setShowDrawingModal(false)}
-              className="text-gray-400 hover:text-gray-800 hover:bg-gray-100 p-2 rounded-lg transition-colors"
+              className="cursor-pointer text-gray-400 hover:text-gray-600 p-1 rounded-md hover:bg-gray-200 transition-all active:scale-95"
               aria-label="Close drawing modal"
             >
-              ✕
+              <span className="text-xl">✕</span>
             </button>
           </div>
 
-          <div className="flex-1 flex flex-col p-6 gap-4 overflow-y-auto">
+          <div className="flex-1 flex flex-col gap-0 overflow-hidden">
             {/* Controls */}
-            <div className="flex flex-wrap gap-4 items-center pb-4 border-b border-gray-200">
+            <div className="flex flex-wrap gap-3 items-center px-5 py-3 border-b border-gray-100 bg-white shrink-0">
               <div className="flex items-center gap-3">
-                <label className="text-sm font-medium text-gray-700">
-                  Brush Size:
+                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide">
+                  Size:
                 </label>
                 <input
                   type="range"
@@ -638,48 +733,57 @@ const Editor = ({
                   max="20"
                   value={lineWidth}
                   onChange={(e) => setLineWidth(parseInt(e.target.value))}
-                  className="w-28 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                  className="cursor-pointer w-24 h-2 bg-gray-200 hover:bg-gray-300 rounded-full appearance-none transition-colors"
                 />
-                <span className="text-sm text-gray-600 font-medium min-w-10">
-                  {lineWidth}px
+                <span className="text-xs text-gray-500 font-medium min-w-8 text-right -ml-[25px]">
+                  {lineWidth}
                 </span>
               </div>
-              <div className="flex items-center gap-3">
-                <label className="text-sm font-medium text-gray-700">
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide">
                   Color:
                 </label>
                 <input
                   type="color"
                   value={lineColor}
                   onChange={(e) => setLineColor(e.target.value)}
-                  className="w-12 h-10 rounded cursor-pointer border-2 border-gray-300 hover:border-indigo-400 transition-colors"
+                  className="cursor-pointer w-8 h-8 rounded border border-gray-300 hover:border-gray-400 transition-colors"
                 />
               </div>
               <button
                 onClick={clearCanvas}
-                className="ml-auto px-4 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                className="cursor-pointer ml-auto px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 rounded-md transition-colors active:scale-95"
               >
-                Clear Canvas
+                Clear
               </button>
             </div>
 
-            {/* Canvas */}
-            <div className="border-2 border-dashed border-gray-300 rounded-lg shadow-inner cursor-crosshair overflow-hidden touch-none bg-white flex-1 flex items-center justify-center min-h-[450px]">
-              <canvas ref={canvasRef} className="w-full h-full max-w-2xl" />
+            {/* Canvas - takes all remaining space */}
+            <div
+              onMouseEnter={() => setIsHovering(true)}
+              onMouseLeave={() => setIsHovering(false)}
+              className={`flex-1 border-0 overflow-hidden touch-none bg-white flex items-center justify-center transition-all ${
+                isHovering ? "shadow-sm" : ""
+              }`}
+            >
+              <canvas
+                ref={canvasRef}
+                className="cursor-crosshair w-full h-full"
+              />
             </div>
           </div>
 
           {/* Footer */}
-          <div className="flex justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
+          <div className="flex justify-end gap-2 p-4 border-t border-gray-100 bg-gray-50">
             <button
               onClick={() => setShowDrawingModal(false)}
-              className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors"
+              className="cursor-pointer px-4 py-2 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 hover:border-gray-300 rounded-lg transition-all active:scale-95"
             >
               Cancel
             </button>
             <button
               onClick={saveDrawing}
-              className="px-6 py-2 bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg font-medium shadow-md transition-colors"
+              className="cursor-pointer px-5 py-2 text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800 rounded-lg transition-all active:scale-95 shadow-sm"
             >
               Insert Drawing
             </button>
@@ -726,21 +830,32 @@ const Editor = ({
       while (i < lines.length) {
         const line = lines[i];
 
-        // images
-        const imgMatch = line.match(/!\[(.*?)\]\((.*?)\)/);
+        // images - use greedy matching to handle data URLs with parentheses
+        const imgMatch = line.match(/!\[(.*?)\]\((.+)\)$/);
         if (imgMatch) {
           flushList();
+          const altText = imgMatch[1];
+          const imgSrc = imgMatch[2];
+          console.log("Image found:", { altText, srcLength: imgSrc.length });
           rendered.push(
             <div key={`img-${i}`} className="flex justify-center my-6">
               <img
-                src={imgMatch[2]}
-                alt={imgMatch[1]}
+                src={imgSrc}
+                alt={altText}
                 className="max-w-full rounded-xl shadow-md border border-gray-100"
               />
             </div>
           );
           i++;
           continue;
+        }
+
+        // If line looks like image markdown but isn't matching, log it for debugging
+        if (line.includes("![") && line.includes("](")) {
+          console.warn(
+            "Line looks like image but didn't match regex:",
+            line.substring(0, 100)
+          );
         }
 
         // headings
@@ -1422,8 +1537,8 @@ const Editor = ({
           <ActionBtn
             onClick={handleCopy}
             icon={Copy}
-            tooltip="Copy with markup (Cmd/Ctrl+C)"
-            ariaLabel="Copy with markup"
+            tooltip="Copy content (Cmd/Ctrl+C)"
+            ariaLabel="Copy content (Cmd/Ctrl+C)"
             tooltipPosition="bottom"
             className="p-2 rounded-full hover:bg-blue-50 text-gray-400 hover:text-blue-600"
           />
@@ -1469,8 +1584,8 @@ const Editor = ({
         <ToolbarBtn
           onClick={() => tiptapRef.current?.insertBlock("> ")}
           icon={Quote}
-          title="Quote (Cmd/Ctrl+Shift+>)"
-          ariaLabel="Quote (Cmd/Ctrl+Shift+>)"
+          title="Quote (Cmd/Ctrl+Shift+B)"
+          ariaLabel="Quote (Cmd/Ctrl+Shift+B)"
         />
         <ToolbarBtn
           onClick={() => tiptapRef.current?.insertText("`", "`")}
@@ -1479,10 +1594,16 @@ const Editor = ({
           ariaLabel="Inline Code (Cmd/Ctrl+`)"
         />
         <ToolbarBtn
-          onClick={() => tiptapRef.current?.insertText("[", "](url)")}
+          onClick={() => {
+            if (!tiptapRef.current?.hasSelection()) {
+              toast.warning("Select a word please!");
+              return;
+            }
+            tiptapRef.current?.insertText("[", "](url)");
+          }}
           icon={LinkIcon}
-          title="Link - Type [text](url)"
-          ariaLabel="Insert link - Type [text](url)"
+          title="Link - (Cmd/Ctrl+L)"
+          ariaLabel="Insert link - (Cmd/Ctrl+L)"
         />
         <div className="w-px h-5 bg-gray-300 mx-1 shrink-0" />
         <ToolbarBtn
