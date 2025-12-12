@@ -66,20 +66,22 @@ cd Kulsi-AI
 
 3. **Configure ENV Variables**
 
-`VITE_GEMINI_API_KEY=your_gemini_api_key`
+```bash
+VITE_GEMINI_API_KEY=your_gemini_api_key
 
-`JWT_SECRET=your_jwt_secret`
-`MONGODB_URI=your_mongodb_uri`
+JWT_SECRET=your_jwt_secret
+MONGODB_URI=your_mongodb_uri
 
-`VITE_GOOGLE_CLIENT_ID=your_google_client_id`
-`VITE_GITHUB_CLIENT_ID=your_github_client_id`
-`VITE_GITHUB_CLIENT_SECRET=your_github_client_secret`
+VITE_GOOGLE_CLIENT_ID=your_google_client_id
+VITE_GITHUB_CLIENT_ID=your_github_client_id
+VITE_GITHUB_CLIENT_SECRET=your_github_client_secret
 
-`GOOGLE_CLIENT_ID=your_google_client_id`
-`GOOGLE_CLIENT_SECRET=your_google_client_secret`
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
 
-`GITHUB_CLIENT_ID=your_github_client_id`
-`GITHUB_CLIENT_SECRET=your_github_client_secret`
+GITHUB_CLIENT_ID=your_github_client_id
+GITHUB_CLIENT_SECRET=your_github_client_secret
+```
 
 ## ▶️ Running The Project
 
