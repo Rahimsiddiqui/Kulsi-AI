@@ -1,6 +1,6 @@
 # Version 1.0.0
 
-**Release Date:** December 12th, 2025
+**Release Date:** December 9th, 2025
 
 ## 🚀 New Features
 
