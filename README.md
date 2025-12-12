@@ -87,23 +87,17 @@ GITHUB_CLIENT_SECRET=your_github_client_secret
 
 ## ▶️ Running The Project
 
-### Frontend (Development)
+### Development
 
-`npm run dev`
+```bash
+npm run dev:all
+```
 
-### Backend (Development)
+### Production
 
-`npm run server:dev`
-
-### Frontend (Production)
-
-`npm run build`
-
-### Backend (Production)
-
-`npm run server:start`
-
-**NOTE:** For development just run `npm run start:all`
+```bash
+npm run build:all
+```
 
 ## ⌨ Quick Keyboard Shortcuts
 

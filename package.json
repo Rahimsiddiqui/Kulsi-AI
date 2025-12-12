@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "server:dev": "nodemon server/index.js",
     "server:start": "node server/index.js",
-    "start:all": "concurrently \"npm run dev\" \"npm run server:dev\""
+    "dev:all": "concurrently \"npm run dev\" \"npm run server:dev\"",
+    "build:all": "concurrently \"npm run build\" \"npm run server:start\""
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
